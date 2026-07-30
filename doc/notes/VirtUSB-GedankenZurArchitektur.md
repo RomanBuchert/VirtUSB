@@ -30,7 +30,7 @@ Jeder Root-Hub (/dev/virtusb<x>) hat 31 Ports.
 # Organisation
 
 Bevor Code erstellt wird, soll die Architektur geplant werden.
-Das Projekt soll möglichst die Tools von GitLab Community-Edition zur Planung, CI/CD, ... nutzen.
+Das Projekt soll möglichst die Tools von GitHub zur Planung, CI/CD, ... nutzen.
 
 Bevorzugtes Dateiformat zur Dokumentation ist Markdown mit Mermaid zur UML-Darstellung.
 
