@@ -25,14 +25,14 @@ Die enummerierten Devices sollen sich wie echte Devices verhalnte und mittels ls
 Es gibt kein bevorzugtes Device-Backend.
 Die Steuerung des virtuellen Controllers erfolgt über /dev/virtusb<x>
 Der Kerneltreiber unterstützt mehrere /dev/virtusb-Devices. Die Anzahl wird als Parameter beim Modulstart übergeben.
-Jeder Root-Hub (/dev/virtusb<x>) hat 31 Ports.
+Jeder Root-Hub (/dev/virtusb\<x\>) hat 31 Ports.
 
 # Organisation
 
 Bevor Code erstellt wird, soll die Architektur geplant werden.
 Das Projekt soll möglichst die Tools von GitHub zur Planung, CI/CD, ... nutzen.
 
-Bevorzugtes Dateiformat zur Dokumentation ist Markdown mit Mermaid zur UML-Darstellung.
+Bevorzugtes Dateiformat zur Dokumentation ist Markdown mit Mermaid zur UML-Darstellung. Labels in Mermaid müssen immer in doppelte Anführungszeichen gesetzt werden, um Parserprobleme zu vermeiden.
 
 Jeder Milestone / größere Schritt muss in Git getaggt werden. Das Format ist v\<a\>.\<b\>.\<c\>.
 
@@ -43,6 +43,8 @@ Als Milesontes werden vorerst festgelegt:
 - v0.3.\<n\>: Planung der User-API / libvirtusb
 - v0.4.\<n\>: Implementierung der User-API
 
+## Dokumentation
+
 Es wird das ADR-Dokumentationsschema verwendet.
 
 Hinweise zur Codedokumentation:
@@ -52,6 +54,24 @@ Hinweise zur Codedokumentation:
 - Einfache lokale Helferfunktionen müssen nicht mittels Doxygen dokumentiert werden.
 - Für den Kerneltreiber gelten - abweichend hierzu - dessen Coding- und Dokumentationsstil.
 
+- Präfix für Dokumente
+
+	doc/requirements/
+		system-requirements.md
+		software-requirements.md
+		backend-requirements.md
+
+	Damit ist sofort klar, auf welcher Ebene sich die Anforderungen befinden.
+
+- Requirement-Traceability
+	Später könnte jede Anforderung eine kleine Tabelle erhalten:
+
+    | Requirement | Verified by | ADR | Status |
+    |-------------|-------------|-----|--------|
+    | VUSB-FR-001 | - | - | Draft |
+    | VUSB-FR-002 | - | - | Draft |
+    | VUSB-FR-003 | - | - | Draft |
+
 Weitere Hinweise:
 - KI ist als Werkzeug - vergleichbar mit einem Compiler - explizit erlaubt.
 - Als Entwicklungssystem wird Debian und/oder Arch verwendet.
@@ -60,3 +80,5 @@ Weitere Hinweise:
 - Das Projekt soll sowohl mit GCC als auch mit LLVM/clang compilierbar sein.
 - Das Kernelmodul muss DKMS-kompatibel sein und sich via DKMS installieren und entfernen lassen.
 - Es muss Tools geben, um den Kernel zuverlässig via DKMS zu laden und entladen.
+
+
