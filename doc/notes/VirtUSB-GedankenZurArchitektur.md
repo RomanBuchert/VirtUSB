@@ -291,19 +291,27 @@ Status: Draft
 
 - ...
 
+---
+
 # 2. Scope
 
 - ...
+
+---
 
 # 3. Definitions and Abbreviations
 
 - <Definition category>
 - <Abbreviation category>
 
+---
+
 # 4. References
 
 - Internal references
 - External references
+
+---
 
 # <N>. <Chapter Title>
 
@@ -311,18 +319,26 @@ Status: Draft
 - <Topic 2>
 - <Topic 3>
 
+---
+
 # <N>. <Chapter Title>
 
 - <Topic 1>
 - <Topic 2>
 
+---
+
 # <N>. Verification
 
 - <Verification topic>
 
+---
+
 # Appendix A – <Appendix Title>
 
 - <Appendix content>
+
+---
 
 # Appendix B – <Appendix Title>
 
