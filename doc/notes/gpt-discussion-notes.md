@@ -729,3 +729,141 @@ Nein, sofern sich ein echter Host-Controller nicht genauso verhalten würde.
 
 Ich würde diesen Grundsatz sogar über Kapitel 9 hinaus anwenden. Er beschreibt sehr gut die Philosophie von VirtUSB und könnte als eigener ADR festgehalten werden. Darauf könnten sich spätere Kapitel wie die Kernel/User-Schnittstelle oder das Kommunikationsprotokoll direkt beziehen.
 ```
+
+## Next Step: Architecture Review
+```text
+Bis jetzt haben wir im Wesentlichen die Anforderungsphase (Requirements Engineering) abgeschlossen. Die nächsten Dokumente sind keine Requirements mehr, sondern Spezifikationen bzw. Designs, die beschreiben, wie die Anforderungen umgesetzt werden.
+
+Ich würde die Phasen daher so sehen:
+
+Phase	Status
+High-Level Architecture	✅
+System Requirements	✅
+Software Requirements	✅
+Backend Requirements	✅
+Architecture Review	← würde ich jetzt einfügen
+Interface Specifications	danach
+Protocol Specifications	danach
+Detailed Design	danach
+Implementierung	deutlich später
+Warum ich jetzt ein Review machen würde
+
+Ich glaube, jetzt ist der letzte sinnvolle Zeitpunkt.
+
+Wenn wir erst Kernel/User Interface, Kommunikationsprotokoll und Ownership Model schreiben und dann feststellen, dass irgendwo in den Requirements eine Unklarheit steckt, zieht sich diese Unklarheit durch alle nachfolgenden Dokumente.
+
+Jetzt betreffen Änderungen maximal vier Dokumente.
+
+Später vielleicht zehn oder fünfzehn.
+
+Ich würde das Review in vier Durchgänge aufteilen
+1. Architektur-Review
+
+Der wichtigste Punkt.
+
+Fragen wie:
+
+Gibt es Widersprüche?
+Sind Verantwortlichkeiten eindeutig?
+Fehlt irgendwo etwas?
+Wird irgendwo implizit etwas vorausgesetzt?
+Sind Begriffe konsistent?
+Ist die Abgrenzung zwischen Requirements und Spezifikation sauber?
+
+Das ist eigentlich schon ein Mini-Design-Review.
+
+2. Konsistenz-Review
+
+Hier würde ich explizit dokumentübergreifend prüfen:
+
+Definitionen
+Glossar
+Begriffe
+"Backend"
+"Virtual USB Device"
+"Instance"
+"Controller"
+"Root Hub"
+"Transfer"
+"Enumeration"
+
+Gibt es überall dieselbe Bedeutung?
+
+3. Dokumenten-/Format-Review
+
+Hier eher handwerklich:
+
+Kapitelstruktur
+Nummerierung
+Überschriften
+Horizontal Rules (---)
+Tabellen
+Bullet-Style
+Codeblöcke
+Mermaid-Style
+Appendix-Aufbau
+Referenzen
+Statuszeilen
+Sprachstil
+
+Das sorgt später für einen professionellen Gesamteindruck.
+
+4. Verständlichkeits-Review
+
+Das finde ich fast spannender als "aufhübschen".
+
+Ich würde mich fragen:
+
+"Wo würde ein neuer Entwickler nach zwei Minuten das Lesen verlieren?"
+
+Dann gezielt überlegen:
+
+lohnt sich hier ein Diagramm?
+lohnt sich eine Tabelle?
+lohnt sich eine kleine Ablaufgrafik?
+
+Nicht mehr.
+
+Nicht weniger.
+
+Ich würde Diagramme ausschließlich dort einsetzen, wo sie Informationen transportieren.
+
+Ich würde sogar noch einen fünften Punkt ergänzen
+5. ADR-Kandidaten identifizieren
+
+Während der letzten Wochen haben wir viele Entscheidungen getroffen.
+
+Einige gehören wahrscheinlich nicht in Requirements.
+
+Zum Beispiel:
+
+Backend = Software, Device = emuliertes Objekt
+USB-Topologie statt Root-Port-Modell
+Host-Controller-Semantik statt Backend-Semantik
+Dokumentationsworkflow
+Architektur vor Implementierung
+
+Ich würde beim Review markieren:
+
+ADR?
+
+ohne sie sofort zu schreiben.
+
+Dann haben wir später eine Liste.
+
+Danach beginnt eine neue Phase
+
+Ich würde den Übergang bewusst machen.
+
+Bis jetzt:
+
+Was muss VirtUSB können?
+
+Ab dann:
+
+Wie realisieren wir das?
+
+Das ist ein echter Meilenstein im Projekt.
+
+Deshalb gefällt mir der Gedanke, vor diesem Übergang einmal "aufzuräumen", sehr gut. Danach startet die Spezifikationsphase auf einer möglichst konsistenten Grundlage.
+```
