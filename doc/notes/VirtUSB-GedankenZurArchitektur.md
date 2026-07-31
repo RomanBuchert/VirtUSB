@@ -133,6 +133,7 @@ Hinweise zur Codedokumentation:
 - Im Sourcefile wird bei der Implementierung / Definition dokumentiert, nich bei der Deklaration.
 - Einfache lokale Helferfunktionen müssen nicht mittels Doxygen dokumentiert werden.
 - Für den Kerneltreiber gelten - abweichend hierzu - dessen Coding- und Dokumentationsstil.
+- Bei Referenzen immer nur auf den Titel verweisen. Keine Links, keine externen Dateikopien, da diese schnell veralten / verwaisen.
 
 - Präfix für Dokumente
 
