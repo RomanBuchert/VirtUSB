@@ -1,5 +1,41 @@
 # VirtUSB High-Level Architecture
 
+**Status:** Draft
+
+## Table of Contents
+1. Purpose
+2. Architectural Goals
+3. Architectural Principles
+4. System Decomposition
+5. Kernel-Side Components
+6. Controller and Root Hub Model
+7. Port and Device Model
+8. Backend Model
+9. Transfer Model
+10. Communication Model
+11. Runtime Model
+12. Concurrency Model
+13. Failure and Recovery Model
+14. Extensibility
+15. Architectural Constraints
+16. Open Architectural Decisions
+
+## Glossary
+- **Host Controller** – Virtual USB Host Controller exposed to the Linux USB subsystem.
+- **Controller Instance** – Independent virtual controller with one Root Hub, 31 ports and one controller interface.
+- **Controller Interface** – Logical kernel-userspace interface of one controller.
+- **Root Hub** – Virtual upstream USB hub owned by one controller.
+- **Downstream Port** – Attachment point for at most one virtual USB device.
+- **Backend** – Userspace component implementing USB device behaviour.
+- **Virtual USB Device** – Device visible to Linux while connected.
+- **Association** – Backend assigned to a port.
+- **Connection** – Makes an associated backend visible on the USB bus.
+- **Transfer** – One USB request together with its completion.
+- **Runtime Object** – Controller, port, backend, transfer or similar architectural object.
+- **Ownership** – Exclusive lifetime and cleanup responsibility.
+
+---
+
 ## 1. Purpose
 
 This document defines the high-level architecture of VirtUSB.
@@ -42,6 +78,7 @@ requirements take precedence.
 
 ---
 
+---
 ## 2. Architectural Goals
 
 VirtUSB shall provide a reusable infrastructure for implementing virtual USB
@@ -208,6 +245,7 @@ integration can be tested independently and systematically.
 
 ---
 
+---
 ## 3. Architectural Principles
 
 The following principles guide the design and evolution of VirtUSB. They shall
@@ -317,6 +355,7 @@ avoided.
 
 ---
 
+---
 ## 4. System Decomposition
 
 VirtUSB is divided into kernel-space and userspace components.
@@ -526,6 +565,7 @@ semantics are defined in subsequent architecture documents.
 ---
 
 
+---
 ## 5. Kernel-Side Components
 
 The VirtUSB kernel module provides the common infrastructure required to expose
@@ -638,6 +678,7 @@ userspace.
 
 ---
 
+---
 ## 6. Controller and Root Hub Model
 
 VirtUSB models one or more independent virtual USB Host Controllers.
@@ -729,6 +770,7 @@ port rather than as part of the controller architecture.
 
 ---
 
+---
 ## 7. Port and Device Model
 
 A downstream port represents the attachment point of a virtual USB device.
@@ -808,6 +850,7 @@ Only the final state results in a visible USB device on the virtual USB bus.
 
 ---
 
+---
 ## 8. Backend Model
 
 A backend implements the behaviour of one virtual USB device.
@@ -878,6 +921,7 @@ implementation remains outside the scope of this architecture.
 
 ---
 
+---
 ## 9. Transfer Model
 
 VirtUSB transports USB transfers between the Linux USB subsystem and the
@@ -947,6 +991,7 @@ required by the USB specification.
 
 ---
 
+---
 ## 10. Communication Model
 
 The VirtUSB architecture defines a logical communication model between the
@@ -1190,6 +1235,7 @@ preserving the architectural relationships defined by this document.
 
 ---
 
+---
 ## 12. Concurrency Model
 
 The VirtUSB architecture supports concurrent operation of multiple controller
@@ -1289,6 +1335,7 @@ remains outside the scope of the architecture.
 
 ---
 
+---
 ## 13. Failure and Recovery Model
 
 The VirtUSB architecture defines how failures are detected, contained, and
@@ -1397,6 +1444,7 @@ relationships defined by this document.
 
 ---
 
+---
 ## 14. Extensibility
 
 The VirtUSB architecture is designed to support future evolution without
@@ -1463,6 +1511,7 @@ architecture documentation.
 
 ---
 
+---
 ## 15. Architectural Constraints
 
 The following architectural constraints define the fundamental characteristics
@@ -1548,6 +1597,7 @@ Records (ADRs).
 
 ---
 
+---
 ## 16. Open Architectural Decisions
 
 The VirtUSB architecture will continue to evolve as implementation progresses
