@@ -66,9 +66,9 @@ Als Milestones werden vorerst festgelegt:
 ## v0.0.x: Architecture design
 
 - v0.0.1  High-Level Architecture ✅
-- v0.0.2  System Requirements
-- v0.0.3  Software Requirements
-- v0.0.4  Backend Requirements
+- v0.0.2  System Requirements ✅
+- v0.0.3  Software Requirements ✅
+- v0.0.4  Backend Requirements ✅
 - v0.0.5  Kernel/User Interface Specification
 - v0.0.6  Userspace Communication Protocol
 - v0.0.7  Kernel/User Ownership & Memory Model
