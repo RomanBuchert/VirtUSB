@@ -37,6 +37,8 @@ Die Steuerung des virtuellen Controllers erfolgt über /dev/virtusb<x>
 Der Kerneltreiber unterstützt mehrere /dev/virtusb-Devices. Die Anzahl wird als Parameter beim Modulstart übergeben.
 Jeder Root-Hub (/dev/virtusb\<x\>) hat 31 Ports.
 
+Sollte in VirtUSB den Devices / Backends via API die Möglichkeit gestattet werden, sich selbst zu disconnecten? Um z.B. eine Reenummerierung zu erlauben? Oder quasi ein PowerOff / Power On zu simulieren?
+
 # Organisation
 
 Bevor Code erstellt wird, soll die Architektur geplant werden.
