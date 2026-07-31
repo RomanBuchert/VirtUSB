@@ -162,3 +162,19 @@ Weitere Hinweise:
 - Es muss Tools geben, um den Kernel zuverlässig via DKMS zu laden und entladen.
 
 
+# Erstellen von neuen Dateien
+
+Anweisung an die KI:
+
+Ich würde deshalb künftig bei allen neuen Dokumenten so beginnen:
+```markdown
+# Kapitel
+
+- Punkt
+- Punkt
+- Punkt
+- Punkt
+```
+Erst wenn wir mit der Liste zufrieden sind, schreiben wir den eigentlichen Fließtext.
+
+Ich halte das sogar für effizienter. Wir diskutieren zunächst die Vollständigkeit ("Haben wir an alles gedacht?") und erst danach die Formulierung ("Wie schreiben wir das?"). Gerade bei Architektur- und Anforderungsdokumenten führt das meist zu besseren Ergebnissen, weil wir uns nicht zu früh auf konkrete Texte festlegen.
