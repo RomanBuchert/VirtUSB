@@ -2,6 +2,23 @@
 
 **Status:** Draft
 
+# Table of Contents
+
+1. Purpose
+2. Scope
+3. Definitions and Abbreviations
+4. References
+5. Software Overview
+6. Kernel Module Requirements
+7. Userspace Requirements
+8. Backend Integration Requirements
+9. Internal Interface Requirements
+10. Software Quality Requirements
+11. Constraints
+12. Verification
+Appendix A – Requirement Traceability
+Appendix B – Reference Documents
+
 # 1. Purpose
 
 This document defines the software requirements for VirtUSB.
@@ -63,6 +80,8 @@ These topics are specified in dedicated project documents.
 ---
 
 # 3. Definitions and Abbreviations
+
+> **Note:** This section serves as the glossary for this document.
 
 This section defines the terminology and abbreviations used throughout this
 document.
@@ -250,8 +269,7 @@ documentation.
 
 The VirtUSB software shall satisfy the following quality requirements:
 
-- be maintainable through a modular software architecture, clear
-  responsibility boundaries, and well-defined interfaces
+- be maintainable
 - support unit testing and integration testing of individual software
   components
 - provide reliable operation under both normal and abnormal conditions
