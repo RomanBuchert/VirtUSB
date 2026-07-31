@@ -1,3 +1,14 @@
+# Gedankennotizen
+
+Dieses Dokument dient als persönliches Labor-/Werkstattbuch für das VirtUSB-Projekt.
+
+Grundsätze:
+- Notizen werden ausschließlich ergänzt.
+- Inhalte werden grundsätzlich nicht gelöscht.
+- Zur besseren Übersicht dürfen Inhalte umsortiert werden.
+- Veraltete oder verworfene Ideen bleiben erhalten und werden ggf. als solche gekennzeichnet.
+- Das Dokument ist bewusst informell und dient ausschließlich als persönliche Arbeitsgrundlage.
+
 Folgende Aufgabenstellung:
 # Präambel
 Der Projektname ist VirtUSB.
@@ -34,14 +45,71 @@ Das Projekt soll möglichst die Tools von GitHub zur Planung, CI/CD, ... nutzen.
 
 Bevorzugtes Dateiformat zur Dokumentation ist Markdown mit Mermaid zur UML-Darstellung. Labels in Mermaid müssen immer in doppelte Anführungszeichen gesetzt werden, um Parserprobleme zu vermeiden.
 
+# Milestones
+
 Jeder Milestone / größere Schritt muss in Git getaggt werden. Das Format ist v\<a\>.\<b\>.\<c\>.
 
-Als Milesontes werden vorerst festgelegt:
-- v0.0.\<n\>: Architekturplanung.
-- v0.1.\<n\>: Implementierung bis zu Bulk- und Interrupttransfer.
-- v0.2.\<n\>: Implementierung bis Isochronoustransfer.
-- v0.3.\<n\>: Planung der User-API / libvirtusb
-- v0.4.\<n\>: Implementierung der User-API
+Als Milestones werden vorerst festgelegt:
+
+## v0.0.x: Architecture design
+
+- v0.0.1  High-Level Architecture
+- v0.0.2  System Requirements
+- v0.0.3  Software Requirements
+- v0.0.4  Backend Requirements
+- v0.0.5  Kernel/User Interface Specification
+- v0.0.6  Userspace Communication Protocol
+- v0.0.7  Kernel/User Ownership & Memory Model
+- v0.0.8  Transfer Queue & Scheduling Model
+- v0.0.9  Synchronization & Concurrency Design
+- v0.0.10 Architecture Review & Baseline Freeze
+
+## v0.1.x: Core USB functionality
+
+  - Core Kernel framework
+  - Virtual Host Controller
+  - Root Hub
+  - Port management
+  - Userspace communication
+  - Control transfers
+  - Bulk transfers
+  - Interrupt transfers
+
+## v0.2.x: Full USB functionality
+
+  - Isochronous transfers
+  - Robust error handling
+  - Performance optimizations
+  - Long-term stability
+
+## v0.3.x: Public API specified
+
+  - libvirtusb architecture
+  - Public API specification
+  - API documentation
+  - Example applications
+  - API stabilization
+
+## v0.4.x: Public API implemented
+
+  - libvirtusb implementation
+  - Unit tests
+  - Integration tests
+  - Example applications
+  - Documentation updates
+
+## v0.5.x: Production readiness
+
+  - Developer documentation completed
+  - User documentation
+  - CI/CD pipeline
+  - Packaging
+  - DKMS packaging
+  - Performance tuning
+  - Compatibility testing
+  - Release preparation
+
+## v1.0.0: First stable release
 
 ## Dokumentation
 
