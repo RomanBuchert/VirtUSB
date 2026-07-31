@@ -2,7 +2,22 @@
 
 **Status:** Draft
 
-## 1. Purpose
+# Table of Contents
+
+1. Purpose
+2. Scope
+3. Definitions and Abbreviations
+4. References
+5. System Overview
+6. Functional Requirements
+7. Interface Requirements
+8. Non-Functional Requirements
+9. Constraints
+10. Explicit Non-Goals
+11. Verification
+Appendix A – Requirement Traceability
+
+# 1. Purpose
 
 This document defines the system requirements for VirtUSB.
 
@@ -21,7 +36,7 @@ algorithms, data structures, interfaces or other design decisions.
 
 ---
 
-## 2. Scope
+# 2. Scope
 
 VirtUSB is a Linux-based software system providing one or more virtual USB Host
 Controllers for developing, testing, and validating USB devices without
@@ -64,7 +79,9 @@ Typical use cases include:
 
 ---
 
-## 3. Definitions and Abbreviations
+# 3. Definitions and Abbreviations
+
+> **Note:** This section serves as the glossary for this document.
 
 This section defines the terminology and abbreviations used throughout this
 document.
@@ -101,7 +118,7 @@ The following abbreviations are used throughout this document.
 
 ---
 
-## 4. References
+# 4. References
 
 This document is based on the following references.
 
@@ -117,7 +134,7 @@ requirements relevant to this specification.
 
 ---
 
-## 5. System Overview
+# 5. System Overview
 
 This section provides a high-level overview of the problem addressed by VirtUSB
 and the environment in which the system operates.
@@ -173,7 +190,7 @@ This section defines the functional requirements of VirtUSB. These requirements
 describe the externally observable behaviour of the system without specifying
 implementation details.
 
-## 6.1 Virtual Host Controllers
+# 6.1 Virtual Host Controllers
 
 VirtUSB shall support one or more virtual USB Host Controllers.
 
@@ -188,7 +205,7 @@ and virtual USB bus.
 The creation, initialization, and removal of controllers shall be supported
 through the documented userspace interface.
 
-## 6.2 Virtual USB Devices
+# 6.2 Virtual USB Devices
 
 VirtUSB shall support software-defined virtual USB devices.
 
@@ -207,7 +224,7 @@ corresponding virtual USB device visible to the operating system.
 The system shall support attaching and detaching virtual USB devices without
 requiring controller recreation.
 
-## 6.3 Device Enumeration
+# 6.3 Device Enumeration
 
 Virtual USB devices shall be enumerated through the standard Linux USB
 enumeration process.
@@ -222,7 +239,7 @@ The observable enumeration behaviour shall be consistent with that of
 equivalent physical USB devices within the limitations of a software-based
 implementation.
 
-## 6.4 USB Transfers
+# 6.4 USB Transfers
 
 VirtUSB shall support all USB transfer types required by the USB 2.0
 specification.
@@ -267,7 +284,7 @@ USB specification.
 The system shall not guarantee hard real-time timing or deterministic USB frame
 scheduling.
 
-## 6.5 Backend Interaction
+# 6.5 Backend Interaction
 
 VirtUSB shall remain independent of any specific backend implementation.
 
@@ -280,7 +297,7 @@ behaviour.
 The system shall support different backend implementations provided they comply
 with the documented interface.
 
-## 6.6 Userspace Interaction
+# 6.6 Userspace Interaction
 
 The system shall provide a documented userspace interface for managing virtual
 USB controllers and virtual USB devices.
@@ -293,7 +310,7 @@ operations.
 The userspace interface shall support notification of relevant USB bus and
 device lifecycle events.
 
-## 6.7 Error Handling
+# 6.7 Error Handling
 
 The system shall detect invalid operations affecting controller management,
 device management, and backend interaction.
@@ -359,7 +376,7 @@ This section defines the non-functional requirements of VirtUSB. These
 requirements describe the quality attributes and operational characteristics
 expected from the system.
 
-## 8.1 Performance
+# 8.1 Performance
 
 VirtUSB shall provide sufficient performance for interactive USB device
 development, testing, and validation.
@@ -370,7 +387,7 @@ Controllers.
 Performance shall scale with the configured number of controller instances
 within the practical limitations of the underlying Linux system.
 
-## 8.2 Reliability
+# 8.2 Reliability
 
 VirtUSB shall operate reliably during continuous use.
 
@@ -383,7 +400,7 @@ state.
 The system shall support controlled recovery following backend termination or
 device removal.
 
-## 8.3 Maintainability
+# 8.3 Maintainability
 
 VirtUSB shall be designed to support long-term maintenance and future
 development.
@@ -402,7 +419,7 @@ defects.
 The software architecture shall remain modular to facilitate future extension
 and maintenance.
 
-## 8.4 Portability
+# 8.4 Portability
 
 VirtUSB shall support multiple processor architectures supported by the Linux
 kernel where practical.
@@ -412,7 +429,7 @@ The project shall support GCC and LLVM/Clang toolchains.
 Platform-specific implementation details shall be minimized where reasonably
 practical.
 
-## 8.5 Security
+# 8.5 Security
 
 VirtUSB shall operate within the Linux security model.
 
@@ -425,7 +442,7 @@ before processing.
 Trust relationships between kernel-space and userspace shall be explicitly
 defined.
 
-## 8.6 Testability
+# 8.6 Testability
 
 VirtUSB shall be designed to support systematic verification.
 
@@ -437,7 +454,7 @@ components.
 Automated testing shall be supported to facilitate regression testing and
 continuous integration.
 
-## 8.7 Compatibility
+# 8.7 Compatibility
 
 VirtUSB shall maintain compatibility with supported Linux kernel versions.
 
@@ -454,7 +471,7 @@ This section defines constraints that influence the design and implementation of
 VirtUSB. These constraints originate from project objectives, the target
 platform, and external requirements rather than from functional behaviour.
 
-## 9.1 Platform Constraints
+# 9.1 Platform Constraints
 
 VirtUSB shall target Linux systems exclusively.
 
@@ -464,7 +481,7 @@ module.
 The project shall rely only on interfaces intended for external kernel modules
 where reasonably practical.
 
-## 9.2 Technology Constraints
+# 9.2 Technology Constraints
 
 The project shall use CMake as its primary build system.
 
@@ -476,7 +493,7 @@ systems.
 
 Project documentation shall be maintained in Markdown format.
 
-## 9.3 Licensing Constraints
+# 9.3 Licensing Constraints
 
 VirtUSB shall be distributed under an approved open-source license.
 
