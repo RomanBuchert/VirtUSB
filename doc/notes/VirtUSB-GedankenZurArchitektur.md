@@ -9,7 +9,6 @@ Grundsätze:
 - Veraltete oder verworfene Ideen bleiben erhalten und werden ggf. als solche gekennzeichnet.
 - Das Dokument ist bewusst informell und dient ausschließlich als persönliche Arbeitsgrundlage.
 
-Folgende Aufgabenstellung:
 # Präambel
 Der Projektname ist VirtUSB.
 
@@ -45,6 +44,19 @@ Das Projekt soll möglichst die Tools von GitHub zur Planung, CI/CD, ... nutzen.
 
 Bevorzugtes Dateiformat zur Dokumentation ist Markdown mit Mermaid zur UML-Darstellung. Labels in Mermaid müssen immer in doppelte Anführungszeichen gesetzt werden, um Parserprobleme zu vermeiden.
 
+## Tags
+Um den Fortschritt einzelner Punkte anzuzeigen, sollen folgende Unicodesymbole verwendet werden:
+
+|Symbol | Meaning |
+|-------|-------- |
+| ⬜ | Not started |
+| ⏳ | In progress |
+| ✅ | Completed |
+| 🚫 | Blocked |
+| ❌ | Abandoned |
+
+Auf das Symbol ⬜ kann verzichtet werden.
+
 # Milestones
 
 Jeder Milestone / größere Schritt muss in Git getaggt werden. Das Format ist v\<a\>.\<b\>.\<c\>.
@@ -53,7 +65,7 @@ Als Milestones werden vorerst festgelegt:
 
 ## v0.0.x: Architecture design
 
-- v0.0.1  High-Level Architecture
+- v0.0.1  High-Level Architecture ✅
 - v0.0.2  System Requirements
 - v0.0.3  Software Requirements
 - v0.0.4  Backend Requirements
