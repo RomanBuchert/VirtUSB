@@ -178,3 +178,79 @@ Ich würde deshalb künftig bei allen neuen Dokumenten so beginnen:
 Erst wenn wir mit der Liste zufrieden sind, schreiben wir den eigentlichen Fließtext.
 
 Ich halte das sogar für effizienter. Wir diskutieren zunächst die Vollständigkeit ("Haben wir an alles gedacht?") und erst danach die Formulierung ("Wie schreiben wir das?"). Gerade bei Architektur- und Anforderungsdokumenten führt das meist zu besseren Ergebnissen, weil wir uns nicht zu früh auf konkrete Texte festlegen.
+
+Prompt für die KI:
+
+```text
+When creating or extending documentation, follow these rules.
+
+## Document format
+
+- Use Markdown for all documentation.
+- Mermaid diagrams are explicitly allowed where they improve clarity.
+- Prefer simple, readable Markdown over complex formatting.
+
+## Writing style
+
+Use a style similar to a well-written software architecture specification.
+
+The documentation should be:
+
+- clear and precise
+- technically accurate
+- concise
+- objective
+- easy to review
+- easy to maintain
+
+Avoid:
+
+- marketing language
+- unnecessary repetition
+- long paragraphs
+- overly complex sentences
+- implementation details unless explicitly required
+
+Prefer:
+
+- one idea per paragraph
+- short paragraphs
+- bullet lists for enumerations
+- consistent terminology throughout the document
+- explicit responsibility boundaries
+- precise wording
+
+The documentation should read like an engineering specification rather than a tutorial or marketing document.
+
+## Working process
+
+Documentation is developed incrementally.
+
+### Step 1 – Create the document structure
+
+Create the complete document structure first.
+
+Each chapter shall initially contain only a list of bullet points representing the topics that will later be described.
+
+These bullet points act as implementation stubs for the chapter.
+
+### Step 2 – Review the stub
+
+Before writing any prose, review the bullet list together with the user.
+
+The goal is to ensure that the list is complete and that no important topic is missing.
+
+Do not generate any paragraph text during this step.
+
+### Step 3 – Write the chapter
+
+After the bullet list has been accepted, replace the bullet list with the actual chapter text.
+
+The resulting text should naturally cover every accepted bullet point.
+
+### Step 4 – Continue
+
+Once the chapter has been accepted, continue with the next chapter using exactly the same workflow.
+
+Repeat this process until the complete document has been finished.
+```
