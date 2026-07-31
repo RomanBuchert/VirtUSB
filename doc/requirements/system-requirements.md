@@ -81,40 +81,8 @@ Typical use cases include:
 
 # 3. Definitions and Abbreviations
 
-> **Note:** This section serves as the glossary for this document.
-
-This section defines the terminology and abbreviations used throughout this
-document.
-
-The definitions provided here establish a common vocabulary for interpreting
-the system requirements. Where applicable, the terminology is consistent with
-the corresponding architecture documentation.
-
-### 3.1 Terminology
-
-| Term | Description |
-|------|-------------|
-| Host Controller | Virtual USB Host Controller exposed to the Linux USB subsystem |
-| Controller | One virtual Host Controller instance |
-| Root Hub | Virtual USB Root Hub owned by one controller |
-| Port | One downstream Root Hub port |
-| Backend | Software implementing the behaviour of a virtual USB device |
-| Device | Virtual USB device represented by a backend |
-| Controller Interface | Logical kernel-userspace interface of one controller |
-
-### 3.2 Abbreviations
-
-The following abbreviations are used throughout this document.
-
-| Abbreviation | Description |
-|--------------|-------------|
-| USB | Universal Serial Bus |
-| HCD | Host Controller Driver |
-| HCI | Host Controller Interface |
-| URB | USB Request Block |
-| DKMS | Dynamic Kernel Module Support |
-| API | Application Programming Interface |
-| ADR | Architecture Decision Record |
+The terminology and abbreviations used by this document are defined in
+`doc/glossary.md`.
 
 ---
 
@@ -139,7 +107,7 @@ requirements relevant to this specification.
 This section provides a high-level overview of the problem addressed by VirtUSB
 and the environment in which the system operates.
 
-### 5.1 Problem Statement
+## 5.1 Problem Statement
 
 Developing and testing USB devices traditionally requires dedicated physical
 USB hardware. This increases development effort, complicates automated testing,
@@ -163,7 +131,19 @@ Typical use cases include:
 - protocol validation
 - USB software integration testing
 
-### 5.2 System Context
+```mermaid
+flowchart LR
+   linux["Linux USB Subsystem"]
+   virt["VirtUSB"]
+   iface["Userspace Interface"]
+   backend["Backend"]
+
+   linux <--> virt
+   virt <--> iface
+   iface <--> backend
+```
+
+## 5.2 System Context
 
 VirtUSB operates as a Linux kernel module and integrates with the Linux USB
 subsystem through the standard Host Controller Driver (HCD) interface.
@@ -186,11 +166,23 @@ Typical external tools include:
 
 # 6. Functional Requirements
 
+```mermaid
+mindmap
+  root((Functional Requirements))
+    Controllers
+    Devices
+    Enumeration
+    Transfers
+    Backend
+    Userspace
+    Errors
+```
+
 This section defines the functional requirements of VirtUSB. These requirements
 describe the externally observable behaviour of the system without specifying
 implementation details.
 
-# 6.1 Virtual Host Controllers
+## 6.1 Virtual Host Controllers
 
 VirtUSB shall support one or more virtual USB Host Controllers.
 
@@ -205,7 +197,7 @@ and virtual USB bus.
 The creation, initialization, and removal of controllers shall be supported
 through the documented userspace interface.
 
-# 6.2 Virtual USB Devices
+## 6.2 Virtual USB Devices
 
 VirtUSB shall support software-defined virtual USB devices.
 
@@ -224,7 +216,7 @@ corresponding virtual USB device visible to the operating system.
 The system shall support attaching and detaching virtual USB devices without
 requiring controller recreation.
 
-# 6.3 Device Enumeration
+## 6.3 Device Enumeration
 
 Virtual USB devices shall be enumerated through the standard Linux USB
 enumeration process.
@@ -239,7 +231,7 @@ The observable enumeration behaviour shall be consistent with that of
 equivalent physical USB devices within the limitations of a software-based
 implementation.
 
-# 6.4 USB Transfers
+## 6.4 USB Transfers
 
 VirtUSB shall support all USB transfer types required by the USB 2.0
 specification.
@@ -253,7 +245,7 @@ Each submitted transfer shall eventually reach exactly one terminal state:
 - completed with an error
 - cancelled
 
-### 6.4.1 Control Transfers
+## 6.4.1 Control Transfers
 
 The system shall support USB control transfers required for device
 initialization, enumeration, and normal operation.
@@ -261,20 +253,20 @@ initialization, enumeration, and normal operation.
 Standard USB requests defined by the USB specification shall be supported
 through backend implementations.
 
-### 6.4.2 Bulk Transfers
+## 6.4.2 Bulk Transfers
 
 The system shall support USB bulk transfers.
 
 Bulk transfers shall preserve the ordering required by the USB specification.
 
-### 6.4.3 Interrupt Transfers
+## 6.4.3 Interrupt Transfers
 
 The system shall support USB interrupt transfers.
 
 Interrupt transfers shall behave consistently with the USB specification within
 the limitations of the execution environment.
 
-### 6.4.4 Isochronous Transfers
+## 6.4.4 Isochronous Transfers
 
 The system shall support USB isochronous transfers.
 
@@ -284,7 +276,7 @@ USB specification.
 The system shall not guarantee hard real-time timing or deterministic USB frame
 scheduling.
 
-# 6.5 Backend Interaction
+## 6.5 Backend Interaction
 
 VirtUSB shall remain independent of any specific backend implementation.
 
@@ -297,7 +289,7 @@ behaviour.
 The system shall support different backend implementations provided they comply
 with the documented interface.
 
-# 6.6 Userspace Interaction
+## 6.6 Userspace Interaction
 
 The system shall provide a documented userspace interface for managing virtual
 USB controllers and virtual USB devices.
@@ -310,7 +302,7 @@ operations.
 The userspace interface shall support notification of relevant USB bus and
 device lifecycle events.
 
-# 6.7 Error Handling
+## 6.7 Error Handling
 
 The system shall detect invalid operations affecting controller management,
 device management, and backend interaction.
@@ -376,7 +368,7 @@ This section defines the non-functional requirements of VirtUSB. These
 requirements describe the quality attributes and operational characteristics
 expected from the system.
 
-# 8.1 Performance
+## 8.1 Performance
 
 VirtUSB shall provide sufficient performance for interactive USB device
 development, testing, and validation.
@@ -387,7 +379,7 @@ Controllers.
 Performance shall scale with the configured number of controller instances
 within the practical limitations of the underlying Linux system.
 
-# 8.2 Reliability
+## 8.2 Reliability
 
 VirtUSB shall operate reliably during continuous use.
 
@@ -400,7 +392,7 @@ state.
 The system shall support controlled recovery following backend termination or
 device removal.
 
-# 8.3 Maintainability
+## 8.3 Maintainability
 
 VirtUSB shall be designed to support long-term maintenance and future
 development.
@@ -419,7 +411,7 @@ defects.
 The software architecture shall remain modular to facilitate future extension
 and maintenance.
 
-# 8.4 Portability
+## 8.4 Portability
 
 VirtUSB shall support multiple processor architectures supported by the Linux
 kernel where practical.
@@ -429,7 +421,7 @@ The project shall support GCC and LLVM/Clang toolchains.
 Platform-specific implementation details shall be minimized where reasonably
 practical.
 
-# 8.5 Security
+## 8.5 Security
 
 VirtUSB shall operate within the Linux security model.
 
@@ -442,7 +434,7 @@ before processing.
 Trust relationships between kernel-space and userspace shall be explicitly
 defined.
 
-# 8.6 Testability
+## 8.6 Testability
 
 VirtUSB shall be designed to support systematic verification.
 
@@ -454,7 +446,7 @@ components.
 Automated testing shall be supported to facilitate regression testing and
 continuous integration.
 
-# 8.7 Compatibility
+## 8.7 Compatibility
 
 VirtUSB shall maintain compatibility with supported Linux kernel versions.
 
@@ -471,7 +463,7 @@ This section defines constraints that influence the design and implementation of
 VirtUSB. These constraints originate from project objectives, the target
 platform, and external requirements rather than from functional behaviour.
 
-# 9.1 Platform Constraints
+## 9.1 Platform Constraints
 
 VirtUSB shall target Linux systems exclusively.
 
@@ -481,7 +473,7 @@ module.
 The project shall rely only on interfaces intended for external kernel modules
 where reasonably practical.
 
-# 9.2 Technology Constraints
+## 9.2 Technology Constraints
 
 The project shall use CMake as its primary build system.
 
@@ -493,7 +485,7 @@ systems.
 
 Project documentation shall be maintained in Markdown format.
 
-# 9.3 Licensing Constraints
+## 9.3 Licensing Constraints
 
 VirtUSB shall be distributed under an approved open-source license.
 
@@ -526,6 +518,14 @@ VirtUSB is **not** intended to provide:
 
 # 11. Verification
 
+```mermaid
+flowchart LR
+   Req[Requirement] --> Review
+   Review --> Analysis
+   Analysis --> Tests
+   Tests --> Traceability
+```
+
 This section defines how compliance with the system requirements is verified.
 
 Each requirement specified in this document shall be verifiable by one or more
@@ -554,8 +554,22 @@ Requirement traceability shall be maintained throughout the project lifecycle.
 
 ---
 
-# Appendix A – Requirement Traceability
+# Appendix A – Requirement Traceability (Example)
 
-| Requirement | Description | Verification | ADR | Status |
-|-------------|-------------|--------------|-----|--------|
-| VUSB-SR-001 | ... | ... | ... | Draft |
+The following table illustrates the recommended structure of a requirement
+traceability matrix. The actual project traceability matrix is maintained
+separately.
+
+| Requirement | Verification | ADR | Status |
+|-------------|--------------|-----|--------|
+| ...         | ...          | ... | ...    |
+
+---
+# Appendix B – Reference Documents (Example)
+
+The following table illustrates the recommended structure for maintaining
+project reference documents.
+
+| ID      | Document | Version |
+|---------|----------|---------|
+| ...     | ...      | ...     |

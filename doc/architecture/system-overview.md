@@ -1,6 +1,6 @@
 # VirtUSB System Overview
 
-## 1. Purpose
+# 1. Purpose
 
 This document provides a high-level overview of VirtUSB.
 
@@ -12,7 +12,14 @@ architecture documentation and in Architecture Decision Records (ADRs).
 
 ---
 
-## 2. System Objective
+# Definitions and Abbreviations
+
+The terminology and abbreviations used by this document are defined in
+`doc/glossary.md`.
+
+---
+
+# 2. System Objective
 
 VirtUSB is a virtual USB Host Controller for Linux.
 
@@ -25,7 +32,7 @@ USB Host Controller.
 
 ---
 
-## 3. System Context
+# 3. System Context
 
 VirtUSB connects virtual USB device backends to the standard Linux USB stack.
 
@@ -55,9 +62,27 @@ backends is not defined by this document.
 
 ---
 
-## 4. Principal Components
+# 4. Principal Components
 
-### 4.1 VirtUSB Kernel Module
+```mermaid
+flowchart LR
+   ctrl["Control Software"]
+   backend["Backend"]
+   kernel["VirtUSB Kernel Module"]
+   hcd["Virtual Host Controller"]
+   hub["Virtual Root Hub"]
+   linux["Linux USB Subsystem"]
+
+   ctrl <--> kernel
+   ctrl <--> backend
+   backend <--> kernel
+   kernel --> hcd
+   hcd --> hub
+   hub --> linux
+```
+
+
+## 4.1 VirtUSB Kernel Module
 
 The VirtUSB kernel module implements one or more virtual USB Host Controller
 instances.
@@ -75,7 +100,7 @@ Its principal responsibilities are:
 
 The kernel module does not implement device-specific USB behaviour.
 
-### 4.2 Virtual Host Controller
+## 4.2 Virtual Host Controller
 
 A controller is one independent virtual USB Host Controller instance.
 
@@ -89,7 +114,7 @@ Each controller:
 
 The number of controller instances is configured when the kernel module is loaded.
 
-### 4.3 Virtual Root Hub
+## 4.3 Virtual Root Hub
 
 Each virtual Host Controller provides exactly one virtual Root Hub.
 
@@ -117,7 +142,7 @@ flowchart TD
    RH --> P31
 ```
 
-### 4.4 Virtual USB Device Backend
+## 4.4 Virtual USB Device Backend
 
 A backend implements the behaviour of a virtual USB device.
 
@@ -135,7 +160,7 @@ VirtUSB shall not require or prefer a particular backend implementation.
 A backend may be implemented by a userspace process, a library, a test framework,
 or another software component, provided that it uses the defined VirtUSB interface.
 
-### 4.5 Control Software
+## 4.5 Control Software
 
 Control software manages virtual controllers and virtual devices through the
 VirtUSB control interface.
@@ -153,7 +178,7 @@ this interface. The library is not required for the initial kernel implementatio
 
 ---
 
-## 5. System Boundary
+# 5. System Boundary
 
 VirtUSB is responsible for virtual Host Controller behaviour and integration with
 the Linux USB subsystem.
@@ -182,7 +207,24 @@ flowchart LR
    control <--> backend
 ```
 
-### 5.1 VirtUSB Responsibilities
+```mermaid
+flowchart LR
+   subgraph VirtUSB
+      hc["Host Controller"]
+      ports["Ports"]
+      routing["Transfer Routing"]
+   end
+
+   subgraph Backend
+      usb["USB Behaviour"]
+      desc["Descriptors"]
+      eps["Endpoints"]
+   end
+
+   routing <--> usb
+```
+
+## 5.1 VirtUSB Responsibilities
 
 VirtUSB is responsible for:
 
@@ -195,7 +237,7 @@ VirtUSB is responsible for:
 - reporting USB connection and disconnection events
 - supporting all required USB transfer types
 
-### 5.2 Backend Responsibilities
+## 5.2 Backend Responsibilities
 
 A backend is responsible for:
 
@@ -206,7 +248,7 @@ A backend is responsible for:
 - maintaining device-specific protocol and application state
 - generating transfer results and device data
 
-### 5.3 Explicit Boundary
+## 5.3 Explicit Boundary
 
 VirtUSB provides the transport and Host Controller infrastructure required for a
 backend to implement a USB device compliant with the USB 2.0 Device Framework.
@@ -216,7 +258,22 @@ returning device descriptors or defining device configurations.
 
 ---
 
-## 6. Typical Operational Flow
+# 6. Typical Operational Flow
+
+```mermaid
+stateDiagram-v2
+   [*] --> ModuleLoaded
+   ModuleLoaded --> ControllerReady
+   ControllerReady --> BackendAttached
+   BackendAttached --> Connected
+   Connected --> Enumerated
+   Enumerated --> Operational
+   Operational --> Disconnected
+   Disconnected --> BackendDetached
+   BackendDetached --> [*]
+```
+
+
 
 A typical virtual device session follows this sequence:
 
@@ -260,7 +317,7 @@ sequenceDiagram
 
 ---
 
-## 7. Transfer Model
+# 7. Transfer Model
 
 VirtUSB shall support the standard USB transfer types:
 
@@ -276,7 +333,7 @@ and interface specifications.
 
 ---
 
-## 8. Timing Model
+# 8. Timing Model
 
 VirtUSB does not provide hard real-time guarantees.
 
@@ -295,7 +352,7 @@ conditions.
 
 ---
 
-## 9. Deployment View
+# 9. Deployment View
 
 The initial VirtUSB deployment consists of an out-of-tree Linux kernel module and
 one or more external backend applications or libraries.
@@ -326,7 +383,7 @@ The kernel module shall be installable and removable through DKMS.
 
 ---
 
-## 10. Interfaces
+# 10. Interfaces
 
 VirtUSB has the following principal interfaces:
 
@@ -342,7 +399,7 @@ The concrete userspace protocol and API are outside the scope of this overview.
 
 ---
 
-## 11. Project Scope
+# 11. Project Scope
 
 The VirtUSB project includes:
 
@@ -356,7 +413,7 @@ The VirtUSB project includes:
 
 ---
 
-## 12. Out of Scope
+# 12. Out of Scope
 
 The following items are outside the responsibility of VirtUSB:
 
@@ -370,7 +427,7 @@ The following items are outside the responsibility of VirtUSB:
 
 ---
 
-## 13. Architectural Constraints
+# 13. Architectural Constraints
 
 The following constraints apply to the system:
 
@@ -387,7 +444,7 @@ The following constraints apply to the system:
 
 ---
 
-## 14. Open Architectural Questions
+# 14. Open Architectural Questions
 
 The following topics require further architectural definition:
 

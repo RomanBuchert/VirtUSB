@@ -81,42 +81,11 @@ These topics are specified in dedicated project documents.
 
 # 3. Definitions and Abbreviations
 
-> **Note:** This section serves as the glossary for this document.
-
-This section defines the terminology and abbreviations used throughout this
-document.
-
-The definitions provided here establish a common vocabulary for interpreting
-the software requirements. Where applicable, the terminology is consistent with
-the System Requirements and the High-Level Architecture.
-
-## 3.1 Terminology
-
-| Term | Description |
-|------|-------------|
-| Kernel Module | Linux kernel module implementing the VirtUSB Host Controller functionality |
-| Userspace Component | Software communicating with the kernel module through the documented interface |
-| Backend | Software implementing the behaviour of a virtual USB device |
-| Controller | One virtual USB Host Controller instance |
-| Root Hub | Virtual USB Root Hub owned by one controller |
-| Port | One downstream Root Hub port |
-| Device | Virtual USB device represented by a backend |
-| Controller Interface | Logical interface between one controller and its associated userspace component |
-
-## 3.2 Abbreviations
-
-The following abbreviations are used throughout this document.
-
-| Abbreviation | Description |
-|--------------|-------------|
-| USB | Universal Serial Bus |
-| HCD | Host Controller Driver |
-| HCI | Host Controller Interface |
-| URB | USB Request Block |
-| API | Application Programming Interface |
-| ADR | Architecture Decision Record |
+The terminology and abbreviations used by this document are defined in
+`doc/glossary.md`.
 
 ---
+
 
 # 4. References
 
@@ -136,6 +105,17 @@ this specification.
 ---
 
 # 5. Software Overview
+
+```mermaid
+flowchart LR
+   KM["Kernel Module"]
+   US["Userspace"]
+   BE["Backend"]
+
+   KM <--> US
+   US <--> BE
+```
+
 
 This section provides an overview of the software structure of VirtUSB.
 
@@ -164,6 +144,19 @@ overall system architecture defined by the High-Level Architecture.
 ---
 
 # 6. Kernel Module Requirements
+
+```mermaid
+flowchart LR
+   HC["Host Controller"]
+   Ports["Ports"]
+   Xfers["Transfers"]
+   Events["Events"]
+
+   HC --> Ports
+   Ports --> Xfers
+   Xfers --> Events
+```
+
 
 The VirtUSB kernel module shall provide the functionality required to implement
 one or more independent virtual USB Host Controller instances.
@@ -219,6 +212,14 @@ connection is closed or when the application terminates.
 ---
 
 # 8. Backend Integration Requirements
+
+```mermaid
+flowchart LR
+   Backend --> Interface
+   Interface --> Userspace
+   Userspace --> Kernel
+```
+
 
 Backend integration shall satisfy the following requirements:
 
@@ -311,6 +312,15 @@ remaining suitable for the project requirements.
 ---
 
 # 12. Verification
+
+```mermaid
+flowchart LR
+   Requirements --> Reviews
+   Reviews --> Analysis
+   Analysis --> Tests
+   Tests --> Traceability
+```
+
 
 Compliance with the software requirements defined in this document shall be
 verified using appropriate verification methods.

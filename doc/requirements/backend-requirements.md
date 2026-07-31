@@ -82,41 +82,11 @@ These topics are specified in dedicated project documents.
 ---
 # 3. Definitions and Abbreviations
 
-> **Note:** This section serves as the glossary for this document.
-
-This section defines the terminology and abbreviations used throughout this
-document.
-
-The definitions provided here establish a common vocabulary for interpreting
-the backend requirements. Where applicable, the terminology is consistent with
-the Software Requirements and the High-Level Architecture.
-
-## 3.1 Terminology
-
-| Term | Description |
-|------|-------------|
-| Backend | Software implementing the behaviour of a virtual USB device |
-| Backend Instance | One runtime instance of a backend implementation |
-| Virtual USB Device | USB device represented by a backend implementation |
-| Endpoint | USB communication endpoint implemented by a virtual USB device |
-| USB Transfer | USB transaction processed by a backend implementation |
-| Controller | One virtual USB Host Controller instance |
-| Controller Interface | Logical interface between one controller instance and its associated userspace component |
-| Backend Interface | Logical interface between a backend implementation and the userspace component |
-| Backend Capability | Functionality or characteristic provided by a backend implementation and exposed through the documented backend interface |
-
-## 3.2 Abbreviations
-
-The following abbreviations are used throughout this document.
-
-| Abbreviation | Description |
-|--------------|-------------|
-| USB | Universal Serial Bus |
-| API | Application Programming Interface |
-| URB | USB Request Block |
-| ADR | Architecture Decision Record |
+The terminology and abbreviations used by this document are defined in
+`doc/glossary.md`.
 
 ---
+
 # 4. References
 
 The following documents are referenced by this specification.
@@ -202,6 +172,18 @@ Backend implementations should also satisfy the following recommendations:
 
 ---
 # 7. Backend Lifecycle Requirements
+
+```mermaid
+stateDiagram-v2
+   [*] --> Registered
+   Registered --> Initialized
+   Initialized --> Active
+   Active --> Deactivating
+   Deactivating --> Shutdown
+   Shutdown --> Destroyed
+   Destroyed --> [*]
+```
+
 
 Backend implementations shall satisfy the following lifecycle requirements:
 
@@ -401,6 +383,19 @@ Backend implementations shall:
 
 ---
 # 10. Backend Interface Requirements
+
+```mermaid
+flowchart LR
+   KM["Kernel Module"]
+   IF["Backend Interface"]
+   BE["Backend"]
+
+   KM --> IF
+   IF --> BE
+   BE --> IF
+   IF --> KM
+```
+
 
 The backend interface defines the responsibilities and behavioural
 contract between the VirtUSB kernel module and backend implementations.

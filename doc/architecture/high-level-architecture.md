@@ -2,7 +2,7 @@
 
 **Status:** Draft
 
-## Table of Contents
+# Table of Contents
 1. Purpose
 2. Architectural Goals
 3. Architectural Principles
@@ -20,23 +20,13 @@
 15. Architectural Constraints
 16. Open Architectural Decisions
 
-## Glossary
-- **Host Controller** – Virtual USB Host Controller exposed to the Linux USB subsystem.
-- **Controller Instance** – Independent virtual controller with one Root Hub, 31 ports and one controller interface.
-- **Controller Interface** – Logical kernel-userspace interface of one controller.
-- **Root Hub** – Virtual upstream USB hub owned by one controller.
-- **Downstream Port** – Attachment point for at most one virtual USB device.
-- **Backend** – Userspace component implementing USB device behaviour.
-- **Virtual USB Device** – Device visible to Linux while connected.
-- **Association** – Backend assigned to a port.
-- **Connection** – Makes an associated backend visible on the USB bus.
-- **Transfer** – One USB request together with its completion.
-- **Runtime Object** – Controller, port, backend, transfer or similar architectural object.
-- **Ownership** – Exclusive lifetime and cleanup responsibility.
+# Definitions and Abbreviations
+
+The terminology and abbreviations used by this document are defined in
+`doc/glossary.md`.
 
 ---
-
-## 1. Purpose
+# 1. Purpose
 
 This document defines the high-level architecture of VirtUSB.
 
@@ -78,15 +68,14 @@ requirements take precedence.
 
 ---
 
----
-## 2. Architectural Goals
+# 2. Architectural Goals
 
 VirtUSB shall provide a reusable infrastructure for implementing virtual USB
 devices on Linux without requiring physical USB hardware.
 
 The architecture shall pursue the following goals:
 
-### 2.1 Native Linux USB Integration
+## 2.1 Native Linux USB Integration
 
 VirtUSB shall integrate with the standard Linux USB subsystem through the Host
 Controller Driver interface.
@@ -95,7 +84,7 @@ Virtual USB devices shall appear to the operating system and to applications as
 regular USB devices. Existing Linux USB drivers and userspace tools shall be
 usable without requiring VirtUSB-specific modifications.
 
-### 2.2 Multiple Virtual Host Controllers
+## 2.2 Multiple Virtual Host Controllers
 
 VirtUSB shall support one or more independent virtual USB Host Controller
 instances.
@@ -104,7 +93,7 @@ The number of controller instances shall be configurable when the kernel module
 is loaded. Each controller instance shall expose its own userspace interface
 and shall operate independently from other controller instances.
 
-### 2.3 Backend Independence
+## 2.3 Backend Independence
 
 The kernel module shall not depend on a specific virtual device backend,
 userspace framework, USB device stack, programming language, or application
@@ -114,7 +103,7 @@ Backends shall be able to implement arbitrary virtual USB devices as long as
 they comply with the VirtUSB userspace interface and the relevant USB protocol
 requirements.
 
-### 2.4 Support for All USB Transfer Types
+## 2.4 Support for All USB Transfer Types
 
 The architecture shall support all USB transfer types defined by the USB
 specification:
@@ -131,7 +120,7 @@ Isochronous transfers shall be supported on a best-effort basis. The
 architecture shall preserve the functional behaviour of isochronous transfers,
 while acknowledging that strict USB frame timing cannot be guaranteed.
 
-### 2.5 USB Bus and Device Lifecycle Support
+## 2.5 USB Bus and Device Lifecycle Support
 
 The architecture shall support the relevant USB bus and device lifecycle
 operations required for realistic virtual USB device behaviour.
@@ -164,7 +153,7 @@ timing-sensitive isochronous operation.
 
 The architecture intentionally does not guarantee hard real-time USB timing.
 
-### 2.6 Clear Separation of Responsibilities
+## 2.6 Clear Separation of Responsibilities
 
 The architecture shall clearly separate:
 
@@ -183,7 +172,7 @@ Device-specific USB behaviour, including USB Chapter 9 request handling,
 descriptor generation, endpoint behaviour, and application logic, shall remain
 the responsibility of the backend.
 
-### 2.7 Modular and Extensible Design
+## 2.7 Modular and Extensible Design
 
 The architecture shall allow individual components and interfaces to evolve
 without requiring a redesign of the entire system.
@@ -200,7 +189,7 @@ Future extensions may include:
 Extensions shall not bypass the documented public interfaces or introduce
 backend-specific behaviour into the core kernel module.
 
-### 2.8 Deterministic Resource Boundaries
+## 2.8 Deterministic Resource Boundaries
 
 The architecture shall define explicit limits and ownership rules for:
 
@@ -216,7 +205,7 @@ The architecture shall define explicit limits and ownership rules for:
 
 Resource usage shall be bounded or configurable where practical.
 
-### 2.9 Robust Failure Handling
+## 2.9 Robust Failure Handling
 
 A failure of a backend, userspace process, controller instance, or attached
 virtual device shall not corrupt unrelated VirtUSB instances or destabilize the
@@ -234,7 +223,7 @@ The architecture shall support controlled cleanup of:
 - controller resources
 - controller removal
 
-### 2.10 Maintainability and Testability
+## 2.10 Maintainability and Testability
 
 The architecture shall support isolated testing of major components and clear
 verification of system requirements.
@@ -245,13 +234,12 @@ integration can be tested independently and systematically.
 
 ---
 
----
-## 3. Architectural Principles
+# 3. Architectural Principles
 
 The following principles guide the design and evolution of VirtUSB. They shall
 be considered when evaluating architectural decisions and future extensions.
 
-### 3.1 Separation of Concerns
+## 3.1 Separation of Concerns
 
 The architecture shall separate responsibilities into clearly defined
 components.
@@ -259,7 +247,7 @@ components.
 Each component shall have a well-defined purpose and shall avoid unnecessary
 knowledge of internal implementation details of other components.
 
-### 3.2 Backend Independence
+## 3.2 Backend Independence
 
 The VirtUSB kernel module shall remain independent of any specific backend
 implementation.
@@ -268,7 +256,7 @@ Backends may be implemented using different programming languages, USB device
 stacks, execution models, or application architectures without requiring
 changes to the kernel module.
 
-### 3.3 Stable Kernel-Userspace Interface
+## 3.3 Stable Kernel-Userspace Interface
 
 The interface between the VirtUSB kernel module and userspace shall be stable,
 well documented, and independent of individual backend implementations.
@@ -276,7 +264,7 @@ well documented, and independent of individual backend implementations.
 Future extensions shall preserve backward compatibility whenever reasonably
 possible.
 
-### 3.4 Explicit and Exclusive Ownership
+## 3.4 Explicit and Exclusive Ownership
 
 Ownership of all resources shall be explicitly defined.
 
@@ -304,7 +292,7 @@ or the resource is destroyed.
 The architecture shall avoid implicit shared ownership and ambiguous cleanup
 responsibilities.
 
-### 3.5 Linux-Native Design
+## 3.5 Linux-Native Design
 
 VirtUSB shall integrate naturally into the Linux kernel architecture and shall
 follow established Linux kernel design principles where appropriate.
@@ -312,7 +300,7 @@ follow established Linux kernel design principles where appropriate.
 Existing Linux kernel infrastructure shall be reused instead of introducing
 project-specific alternatives whenever practical.
 
-### 3.6 Predictable Behaviour
+## 3.6 Predictable Behaviour
 
 The architecture shall provide predictable and well-defined behaviour.
 
@@ -323,14 +311,14 @@ Timing behaviour that cannot be guaranteed shall be documented explicitly.
 
 Unexpected implicit behaviour shall be avoided.
 
-### 3.7 Layered Architecture
+## 3.7 Layered Architecture
 
 The architecture shall be organized into clearly separated abstraction layers.
 
 Higher layers shall depend only on the documented interfaces of lower layers
 and shall not rely on implementation details.
 
-### 3.8 Extensibility
+## 3.8 Extensibility
 
 New functionality shall be introduced by extending documented interfaces
 instead of modifying unrelated architectural components.
@@ -338,14 +326,14 @@ instead of modifying unrelated architectural components.
 The architecture shall avoid introducing backend-specific functionality into
 the common kernel infrastructure.
 
-### 3.9 Documentation Before Implementation
+## 3.9 Documentation Before Implementation
 
 Architectural changes shall be documented before implementation.
 
 Significant architectural decisions shall be captured in Architecture Decision
 Records (ADRs) and reflected in the corresponding architecture documents.
 
-### 3.10 Simplicity
+## 3.10 Simplicity
 
 Architectural solutions should be as simple as reasonably possible while
 meeting the project requirements.
@@ -355,8 +343,7 @@ avoided.
 
 ---
 
----
-## 4. System Decomposition
+# 4. System Decomposition
 
 VirtUSB is divided into kernel-space and userspace components.
 
@@ -397,7 +384,7 @@ flowchart TB
    backend_role -. "represents a device attached to a port" .-> ports
 ```
 
-### 4.1 Linux USB Core
+## 4.1 Linux USB Core
 
 The Linux USB Core discovers and manages virtual USB devices through the
 standard Linux Host Controller Driver interface.
@@ -406,7 +393,7 @@ From the perspective of the Linux USB subsystem, a VirtUSB controller behaves
 like a regular USB Host Controller within the functional and timing limitations
 of the software-only implementation.
 
-### 4.2 VirtUSB Kernel Module
+## 4.2 VirtUSB Kernel Module
 
 The VirtUSB kernel module provides the common infrastructure required to create
 and manage virtual Host Controller instances.
@@ -423,7 +410,7 @@ Its responsibilities include:
 
 The kernel module shall not implement device-specific USB behaviour.
 
-### 4.3 Virtual Host Controller Instance
+## 4.3 Virtual Host Controller Instance
 
 Each configured controller instance is an independent runtime object.
 
@@ -438,7 +425,7 @@ A controller instance contains:
 Failures or state changes within one controller instance shall not directly
 affect other controller instances.
 
-### 4.4 Virtual Root Hub and Ports
+## 4.4 Virtual Root Hub and Ports
 
 Each controller instance owns exactly one virtual Root Hub.
 
@@ -455,7 +442,7 @@ including:
 - suspend and resume
 - change notifications to the Linux USB subsystem
 
-### 4.5 Controller Userspace Interface
+## 4.5 Controller Userspace Interface
 
 Each controller instance exposes a userspace-facing controller interface through
 an associated device node such as:
@@ -496,7 +483,7 @@ In particular, low-frequency administrative operations and high-volume USB
 transfer data may use different transport paths while remaining part of the
 same logical controller interface.
 
-### 4.6 Control Software
+## 4.6 Control Software
 
 Control software manages the administrative state of a virtual controller.
 
@@ -514,7 +501,7 @@ userspace interface.
 Control software describes an architectural role and does not necessarily
 require a separate process or executable.
 
-### 4.7 Virtual USB Device Backend
+## 4.7 Virtual USB Device Backend
 
 A backend implements the observable USB behaviour of a virtual device.
 
@@ -537,7 +524,7 @@ The backend role may be implemented in the same userspace process as the
 control role or in a separate component. The architecture shall not require a
 specific process model.
 
-### 4.8 Component Relationships
+## 4.8 Component Relationships
 
 The Linux USB Core communicates with VirtUSB exclusively through the standard
 Host Controller Driver integration.
@@ -564,9 +551,7 @@ semantics are defined in subsequent architecture documents.
 
 ---
 
-
----
-## 5. Kernel-Side Components
+# 5. Kernel-Side Components
 
 The VirtUSB kernel module provides the common infrastructure required to expose
 one or more virtual USB Host Controllers to the Linux USB subsystem.
@@ -600,7 +585,7 @@ The kernel-side architecture intentionally does **not** implement:
 
 These responsibilities belong exclusively to the userspace backend.
 
-### 5.1 Host Controller
+## 5.1 Host Controller
 
 The Host Controller implements the Linux Host Controller Driver interface and
 represents a virtual USB Host Controller within the Linux USB subsystem.
@@ -613,14 +598,14 @@ Each Host Controller instance operates independently.
 Failures, state changes, or resource exhaustion affecting one controller
 instance shall not directly affect other controller instances.
 
-### 5.2 Root Hub
+## 5.2 Root Hub
 
 Each controller instance owns one virtual Root Hub.
 
 The Root Hub models the upstream USB hub visible to the Linux USB subsystem and
 manages exactly 31 downstream ports.
 
-### 5.3 Port Management
+## 5.3 Port Management
 
 Each downstream port maintains its own operational state.
 
@@ -633,7 +618,7 @@ Typical responsibilities include:
 - suspend and resume
 - change notification
 
-### 5.4 USB Request Routing
+## 5.4 USB Request Routing
 
 USB requests received from the Linux USB subsystem are routed to the backend
 associated with the addressed virtual device.
@@ -644,7 +629,7 @@ submission until completion or cancellation.
 Responses generated by the backend are returned to the Linux USB subsystem
 through the corresponding Host Controller instance.
 
-### 5.5 Userspace Communication
+## 5.5 Userspace Communication
 
 The kernel communicates with userspace through the controller interface.
 
@@ -661,14 +646,14 @@ The concrete communication mechanisms are defined separately.
 The kernel shall detect backend disconnection or failure and perform the
 necessary cleanup to maintain a consistent controller state.
 
-### 5.6 Resource Management
+## 5.6 Resource Management
 
 The kernel owns and manages all kernel-side resources.
 
 Ownership transfers between kernel and userspace shall follow the architectural
 ownership model defined by the communication architecture.
 
-### 5.7 Concurrency
+## 5.7 Concurrency
 
 The kernel-side implementation shall support concurrent operation of multiple
 controller instances.
@@ -678,8 +663,7 @@ userspace.
 
 ---
 
----
-## 6. Controller and Root Hub Model
+# 6. Controller and Root Hub Model
 
 VirtUSB models one or more independent virtual USB Host Controllers.
 
@@ -706,7 +690,19 @@ Ports exist independently of attached devices.
 Device attachment and removal affect the state of a port but do not create or
 destroy the port itself.
 
-### 6.1 Controller Instance
+```mermaid
+flowchart TB
+   controller["Controller Instance"]
+   root["Virtual Root Hub"]
+   ports["31 Downstream Ports"]
+   device["0..1 Virtual USB Device per Port"]
+
+   controller --> root
+   root --> ports
+   ports --> device
+```
+
+## 6.1 Controller Instance
 
 A controller instance represents one independent virtual USB bus.
 
@@ -723,7 +719,7 @@ Controller instances are isolated from one another. State changes, failures, or
 resource exhaustion affecting one controller shall not directly affect other
 controllers.
 
-### 6.2 Root Hub
+## 6.2 Root Hub
 
 Each controller owns one virtual Root Hub.
 
@@ -732,7 +728,7 @@ presenting the USB bus topology to the Linux USB subsystem.
 
 The Root Hub does not implement device-specific behaviour.
 
-### 6.3 Downstream Ports
+## 6.3 Downstream Ports
 
 Each downstream port represents a physical USB port abstraction.
 
@@ -753,7 +749,7 @@ Backend association and device attachment are related but distinct concepts.
 A backend may be associated with a port before the corresponding virtual device
 becomes visible to the Linux USB subsystem.
 
-### 6.4 Bus Topology
+## 6.4 Bus Topology
 
 From the perspective of the Linux USB subsystem, each controller represents one
 independent USB bus.
@@ -770,8 +766,7 @@ port rather than as part of the controller architecture.
 
 ---
 
----
-## 7. Port and Device Model
+# 7. Port and Device Model
 
 A downstream port represents the attachment point of a virtual USB device.
 
@@ -785,7 +780,17 @@ by the virtual Root Hub.
 Removing a device affects only the attachment state of the port. The port
 itself continues to exist.
 
-### 7.1 Port Model
+```mermaid
+stateDiagram-v2
+   [*] --> Unassigned
+   Unassigned --> Associated: assign to port
+   Associated --> Connected: connect device
+   Connected --> Associated: disconnect device
+   Associated --> Unassigned: remove association
+   Unassigned --> [*]: destroy backend
+```
+
+## 7.1 Port Model
 
 Each downstream port:
 
@@ -796,7 +801,7 @@ Each downstream port:
 
 The detailed port state machine is defined separately.
 
-### 7.2 Device Association
+## 7.2 Device Association
 
 A backend represents the implementation of a virtual USB device.
 
@@ -807,7 +812,7 @@ time.
 
 Likewise, each downstream port may be associated with at most one backend.
 
-### 7.3 Device Attachment
+## 7.3 Device Attachment
 
 Associating a backend with a downstream port does not automatically make the
 corresponding virtual USB device visible to the Linux USB subsystem.
@@ -821,7 +826,7 @@ destroying the backend.
 The lifecycle of a backend is therefore independent of the lifecycle of the
 corresponding virtual USB device.
 
-### 7.4 Port Reassignment
+## 7.4 Port Reassignment
 
 A backend may be reassigned to a different downstream port.
 
@@ -834,7 +839,7 @@ shall first be detached before the backend may be assigned to another port.
 The architecture intentionally models this behaviour after physically
 disconnecting a USB cable and reconnecting it to another port.
 
-### 7.5 Device Visibility
+## 7.5 Device Visibility
 
 From the perspective of the Linux USB subsystem, a virtual USB device exists
 only while it is attached to a downstream port and connected through the
@@ -850,8 +855,7 @@ Only the final state results in a visible USB device on the virtual USB bus.
 
 ---
 
----
-## 8. Backend Model
+# 8. Backend Model
 
 A backend implements the behaviour of one virtual USB device.
 
@@ -874,7 +878,7 @@ The backend does not directly interact with the Linux USB subsystem.
 Instead, all communication is performed through the controller interface
 provided by the VirtUSB kernel module.
 
-### 8.1 Backend Lifecycle
+## 8.1 Backend Lifecycle
 
 A backend may exist independently of any controller or port assignment.
 
@@ -890,7 +894,7 @@ A backend may therefore exist while:
 The architecture intentionally separates backend existence from USB device
 visibility.
 
-### 8.2 Backend Responsibilities
+## 8.2 Backend Responsibilities
 
 The backend is responsible for all device-specific behaviour, including:
 
@@ -903,7 +907,7 @@ The backend is responsible for all device-specific behaviour, including:
 
 The VirtUSB kernel module intentionally remains unaware of these details.
 
-### 8.3 Backend Independence
+## 8.3 Backend Independence
 
 The VirtUSB architecture intentionally does not define how a backend is
 implemented.
@@ -921,8 +925,7 @@ implementation remains outside the scope of this architecture.
 
 ---
 
----
-## 9. Transfer Model
+# 9. Transfer Model
 
 VirtUSB transports USB transfers between the Linux USB subsystem and the
 backend associated with the addressed virtual USB device.
@@ -937,7 +940,20 @@ The architecture supports all USB transfer types defined by USB 2.0:
 Transfer handling is independent of the concrete communication mechanism
 between kernel and userspace.
 
-### 9.1 Transfer Lifecycle
+```mermaid
+stateDiagram-v2
+   [*] --> Submitted
+   Submitted --> Routed
+   Routed --> Processing
+   Processing --> Completed
+   Submitted --> Cancelled
+   Routed --> Cancelled
+   Processing --> Cancelled
+   Completed --> [*]
+   Cancelled --> [*]
+```
+
+## 9.1 Transfer Lifecycle
 
 Each USB transfer progresses through a well-defined lifecycle:
 
@@ -951,7 +967,7 @@ Transfers may also be cancelled before completion.
 
 The detailed transfer state model is defined separately.
 
-### 9.2 Transfer Ownership
+## 9.2 Transfer Ownership
 
 A transfer is owned by exactly one component at any point in time.
 
@@ -961,7 +977,7 @@ VirtUSB kernel module, and the backend.
 The architecture intentionally avoids implicit shared ownership of transfer
 objects.
 
-### 9.3 Transfer Independence
+## 9.3 Transfer Independence
 
 Each transfer is processed independently of other transfers unless ordering is
 required by the USB specification.
@@ -969,7 +985,7 @@ required by the USB specification.
 The architecture does not impose additional ordering constraints beyond those
 required for correct USB operation.
 
-### 9.4 Transfer Completion
+## 9.4 Transfer Completion
 
 Each submitted transfer shall eventually reach exactly one terminal state:
 
@@ -979,7 +995,7 @@ Each submitted transfer shall eventually reach exactly one terminal state:
 
 Once completed, a transfer shall not become active again.
 
-### 9.5 Transfer Types
+## 9.5 Transfer Types
 
 All supported USB transfer types follow the same architectural transfer model.
 
@@ -991,8 +1007,7 @@ required by the USB specification.
 
 ---
 
----
-## 10. Communication Model
+# 10. Communication Model
 
 The VirtUSB architecture defines a logical communication model between the
 VirtUSB kernel module and userspace components.
@@ -1012,7 +1027,7 @@ The architecture distinguishes four categories of communication:
 The concrete communication protocol, message formats, transport mechanisms, and
 serialization are defined separately.
 
-### 10.1 Communication Principles
+## 10.1 Communication Principles
 
 Communication between the kernel module and userspace shall follow the
 architectural principles defined by this document.
@@ -1025,7 +1040,7 @@ In particular:
 - communication shall remain backend-independent
 - transport mechanisms remain transparent to higher architectural layers
 
-### 10.2 Administrative Operations
+## 10.2 Administrative Operations
 
 Administrative operations are used to configure and control the virtual USB
 environment.
@@ -1041,7 +1056,7 @@ Typical operations include:
 
 Administrative operations are independent of USB transfer processing.
 
-### 10.3 Device Lifecycle Events
+## 10.3 Device Lifecycle Events
 
 Device lifecycle events represent changes affecting the virtual USB bus.
 
@@ -1056,7 +1071,7 @@ Typical lifecycle events include:
 
 These events describe USB bus state changes rather than USB data transfers.
 
-### 10.4 USB Transfer Requests
+## 10.4 USB Transfer Requests
 
 USB transfer requests originate from the Linux USB subsystem.
 
@@ -1065,7 +1080,7 @@ associated with the addressed virtual USB device.
 
 Each request represents one USB transfer requiring backend processing.
 
-### 10.5 USB Transfer Completion
+## 10.5 USB Transfer Completion
 
 After processing a transfer request, the backend returns exactly one transfer
 completion.
@@ -1078,7 +1093,7 @@ Possible completion results include:
 - failed completion
 - cancelled transfer
 
-### 10.6 Communication Scope
+## 10.6 Communication Scope
 
 Communication is always associated with exactly one controller instance.
 
@@ -1088,7 +1103,7 @@ controller shall not affect other controller instances.
 The architecture intentionally isolates communication between different virtual
 USB buses.
 
-### 10.7 Communication Ordering
+## 10.7 Communication Ordering
 
 Communication shall preserve the ordering required for correct USB operation.
 
@@ -1099,7 +1114,7 @@ Ordering requirements specific to individual communication mechanisms are
 defined separately from this high-level architecture.
 
 ---
-## 11. Runtime Model
+# 11. Runtime Model
 
 The runtime model describes how architectural components are created, interact,
 change state, and are removed during normal operation.
@@ -1112,7 +1127,7 @@ architectural interfaces.
 Runtime behaviour shall remain consistent with the architectural principles and
 responsibility boundaries defined by this document.
 
-### 11.1 Controller Lifecycle
+## 11.1 Controller Lifecycle
 
 A controller instance is created by the VirtUSB kernel module and registered
 with the Linux USB subsystem.
@@ -1131,7 +1146,7 @@ Removing a controller terminates all runtime state associated with that
 controller, including attached devices, pending transfers, and userspace
 communication.
 
-### 11.2 Port Lifecycle
+## 11.2 Port Lifecycle
 
 Downstream ports exist for the entire lifetime of their controller instance.
 
@@ -1151,7 +1166,7 @@ Typical state transitions include:
 
 The detailed port state machine is defined separately.
 
-### 11.3 Backend Lifecycle
+## 11.3 Backend Lifecycle
 
 A backend exists independently of any controller or port assignment.
 
@@ -1167,7 +1182,7 @@ During its lifetime, a backend may:
 The lifecycle of a backend is independent of the lifecycle of the corresponding
 virtual USB device.
 
-### 11.4 Virtual Device Lifecycle
+## 11.4 Virtual Device Lifecycle
 
 A virtual USB device becomes visible to the Linux USB subsystem only after:
 
@@ -1182,7 +1197,7 @@ virtual USB bus.
 Removing a virtual USB device does not necessarily destroy the associated
 backend.
 
-### 11.5 Transfer Runtime
+## 11.5 Transfer Runtime
 
 USB transfers exist only while actively processed.
 
@@ -1197,7 +1212,23 @@ During runtime, a transfer may be:
 
 Completed and cancelled transfers are removed from the active runtime state.
 
-### 11.6 Runtime Relationships
+```mermaid
+flowchart LR
+   controller["Controller"]
+   root["Root Hub"]
+   port["Port"]
+   backend["Backend"]
+   device["Virtual USB Device"]
+   transfer["Transfer"]
+
+   controller --> root
+   root --> port
+   port -. "associated with" .-> backend
+   backend --> device
+   device --> transfer
+```
+
+## 11.6 Runtime Relationships
 
 During normal operation:
 
@@ -1216,7 +1247,7 @@ The runtime model intentionally separates:
 
 These concepts are related but shall not be considered equivalent.
 
-### 11.7 Typical Runtime Sequence
+## 11.7 Typical Runtime Sequence
 
 A typical runtime sequence consists of:
 
@@ -1235,8 +1266,7 @@ preserving the architectural relationships defined by this document.
 
 ---
 
----
-## 12. Concurrency Model
+# 12. Concurrency Model
 
 The VirtUSB architecture supports concurrent operation of multiple controller
 instances, userspace components, and USB transfers.
@@ -1249,7 +1279,7 @@ specification.
 The architecture intentionally does not mandate a particular synchronization or
 threading implementation.
 
-### 12.1 Controller Isolation
+## 12.1 Controller Isolation
 
 Each controller instance operates independently.
 
@@ -1259,7 +1289,7 @@ controller instance shall not directly affect other controller instances.
 Communication, runtime state, and resources remain local to the corresponding
 controller.
 
-### 12.2 Backend Isolation
+## 12.2 Backend Isolation
 
 Each backend operates independently of other backends.
 
@@ -1267,7 +1297,7 @@ A backend shall not require knowledge of the internal state of another backend.
 
 The architecture permits multiple backends to execute concurrently.
 
-### 12.3 Transfer Concurrency
+## 12.3 Transfer Concurrency
 
 Multiple USB transfers may be active simultaneously.
 
@@ -1277,7 +1307,7 @@ processed concurrently where permitted by the USB specification.
 The architecture intentionally does not require sequential processing unless
 mandated by USB protocol semantics.
 
-### 12.4 Synchronization Principles
+## 12.4 Synchronization Principles
 
 The architecture defines synchronization requirements but not synchronization
 mechanisms.
@@ -1292,7 +1322,7 @@ Implementations shall ensure:
 
 The choice of synchronization primitives remains implementation-specific.
 
-### 12.5 Ownership Under Concurrency
+## 12.5 Ownership Under Concurrency
 
 Concurrent execution shall not violate the architectural ownership model.
 
@@ -1304,7 +1334,7 @@ At any point in time:
 
 The architecture intentionally avoids implicit shared ownership.
 
-### 12.6 Ordering Guarantees
+## 12.6 Ordering Guarantees
 
 Operations shall preserve the ordering required by correct USB operation.
 
@@ -1313,7 +1343,7 @@ that are unrelated to USB semantics.
 
 Ordering requirements may differ between independent controller instances.
 
-### 12.7 Execution Model Independence
+## 12.7 Execution Model Independence
 
 The VirtUSB architecture intentionally remains independent of the userspace
 execution model.
@@ -1335,8 +1365,7 @@ remains outside the scope of the architecture.
 
 ---
 
----
-## 13. Failure and Recovery Model
+# 13. Failure and Recovery Model
 
 The VirtUSB architecture defines how failures are detected, contained, and
 recovered while preserving a consistent runtime state.
@@ -1347,7 +1376,7 @@ correct operation of unrelated controller instances or virtual USB devices.
 The architecture intentionally defines behavioural guarantees rather than
 implementation-specific recovery mechanisms.
 
-### 13.1 Failure Detection
+## 13.1 Failure Detection
 
 The architecture assumes that failures affecting architectural components can be
 detected.
@@ -1362,7 +1391,7 @@ Typical failures include:
 
 The concrete detection mechanisms are implementation-specific.
 
-### 13.2 Fault Isolation
+## 13.2 Fault Isolation
 
 Failures shall be contained as locally as reasonably possible.
 
@@ -1375,7 +1404,7 @@ In particular:
 The architecture intentionally separates controller runtime state to support
 fault isolation.
 
-### 13.3 Backend Failure
+## 13.3 Backend Failure
 
 If a backend becomes unavailable while associated with a controller, the
 controller shall restore a consistent runtime state.
@@ -1389,7 +1418,7 @@ Typical recovery actions include:
 
 The architecture does not require automatic backend restart.
 
-### 13.4 Communication Failure
+## 13.4 Communication Failure
 
 If communication between the kernel module and userspace is interrupted, the
 affected controller shall perform the necessary cleanup.
@@ -1399,7 +1428,7 @@ owned resources or inconsistent runtime state.
 
 The concrete recovery procedure is implementation-specific.
 
-### 13.5 Transfer Recovery
+## 13.5 Transfer Recovery
 
 Transfers affected by failures shall eventually reach a terminal state.
 
@@ -1411,7 +1440,7 @@ Depending on the failure scenario, a transfer may:
 
 The architecture intentionally avoids indefinitely active transfers.
 
-### 13.6 Resource Cleanup
+## 13.6 Resource Cleanup
 
 After a failure, resources shall be released according to the architectural
 ownership model.
@@ -1427,7 +1456,7 @@ Cleanup shall include, where applicable:
 Cleanup responsibilities follow the ownership model defined by this
 architecture.
 
-### 13.7 Recovery Behaviour
+## 13.7 Recovery Behaviour
 
 Following successful cleanup, the affected controller may continue normal
 operation where practical.
@@ -1444,8 +1473,7 @@ relationships defined by this document.
 
 ---
 
----
-## 14. Extensibility
+# 14. Extensibility
 
 The VirtUSB architecture is designed to support future evolution without
 requiring fundamental redesign of the existing architecture.
@@ -1457,7 +1485,7 @@ guarantees defined by this document.
 Extensions shall remain compatible with the architectural principles described
 in this document.
 
-### 14.1 Backend Extensibility
+## 14.1 Backend Extensibility
 
 The architecture permits arbitrary backend implementations provided they comply
 with the documented controller interface.
@@ -1473,7 +1501,7 @@ Possible backend implementations include, for example:
 Introducing new backend types shall not require modifications to the core
 architecture.
 
-### 14.2 Communication Extensibility
+## 14.2 Communication Extensibility
 
 The logical controller interface is independent of the underlying communication
 mechanism.
@@ -1482,7 +1510,7 @@ Future implementations may introduce alternative transport mechanisms or
 performance optimizations while preserving the same architectural communication
 model.
 
-### 14.3 Functional Extensibility
+## 14.3 Functional Extensibility
 
 The architecture permits future functional extensions without changing the
 fundamental component relationships.
@@ -1497,7 +1525,7 @@ Possible extensions include, for example:
 
 Such extensions shall integrate through the documented architectural interfaces.
 
-### 14.4 Compatibility
+## 14.4 Compatibility
 
 Future architectural evolution should preserve compatibility wherever
 reasonably practical.
@@ -1511,8 +1539,7 @@ architecture documentation.
 
 ---
 
----
-## 15. Architectural Constraints
+# 15. Architectural Constraints
 
 The following architectural constraints define the fundamental characteristics
 of VirtUSB.
@@ -1520,7 +1547,7 @@ of VirtUSB.
 These constraints apply to all implementations and shall not be violated unless
 the architecture itself is revised.
 
-### 15.1 Platform Constraints
+## 15.1 Platform Constraints
 
 VirtUSB is designed exclusively for Linux.
 
@@ -1534,7 +1561,7 @@ The architecture assumes:
 Supporting additional operating systems requires architectural evaluation and
 may require changes beyond the scope of this architecture.
 
-### 15.2 Controller Architecture
+## 15.2 Controller Architecture
 
 Each controller instance shall provide:
 
@@ -1548,7 +1575,7 @@ Controller instances shall operate independently.
 The architecture intentionally does not support multiple Root Hubs within a
 single controller instance.
 
-### 15.3 Responsibility Boundaries
+## 15.3 Responsibility Boundaries
 
 The architectural separation of responsibilities shall be preserved.
 
@@ -1559,7 +1586,7 @@ In particular:
 - communication shall occur exclusively through the controller interface
 - controller management shall remain independent of backend implementation
 
-### 15.4 Backend Neutrality
+## 15.4 Backend Neutrality
 
 The architecture shall remain independent of any particular backend
 implementation.
@@ -1574,7 +1601,7 @@ No architectural component shall require:
 Backend-specific functionality shall not become part of the common kernel
 architecture.
 
-### 15.5 Ownership Model
+## 15.5 Ownership Model
 
 The explicit ownership model defined by this architecture shall be preserved.
 
@@ -1586,7 +1613,7 @@ At any point in time:
 
 Implicit shared ownership is intentionally prohibited.
 
-### 15.6 Architectural Integrity
+## 15.6 Architectural Integrity
 
 Future extensions shall preserve the architectural principles, component
 relationships, and behavioural guarantees defined by this document.
@@ -1597,8 +1624,7 @@ Records (ADRs).
 
 ---
 
----
-## 16. Open Architectural Decisions
+# 16. Open Architectural Decisions
 
 The VirtUSB architecture will continue to evolve as implementation progresses
 and additional requirements become known.
@@ -1618,7 +1644,7 @@ Topics currently subject to further architectural refinement include:
 
 Additional architectural topics may be introduced as the project evolves.
 
-### 16.1 Architecture Decision Records
+## 16.1 Architecture Decision Records
 
 Architectural decisions shall be documented using Architecture Decision Records
 (ADRs).
@@ -1634,7 +1660,7 @@ Each ADR documents:
 ADRs complement this document by recording the decision-making process rather
 than replacing the architecture itself.
 
-### 16.2 Relationship to this Document
+## 16.2 Relationship to this Document
 
 This document represents the consolidated high-level architecture of VirtUSB.
 
