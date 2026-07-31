@@ -867,3 +867,366 @@ Das ist ein echter Meilenstein im Projekt.
 
 Deshalb gefällt mir der Gedanke, vor diesem Übergang einmal "aufzuräumen", sehr gut. Danach startet die Spezifikationsphase auf einer möglichst konsistenten Grundlage.
 ```
+## Zusätzliche Layeraufteilung
+
+Verweis in `VirtUSB-Sketchbook.md`
+
+>Sollte in VirtUSB den Devices / Backends via API die Möglichkeit gestattet werden, sich selbst zu disconnecten? Um z.B. eine Reenummerierung zu erlauben? Oder quasi ein PowerOff / Power On zu simulieren?
+
+
+```text
+Ja. So ist die Trennung deutlich klarer. Es geht nicht um drei technische USB-Schichten, sondern um drei Steuerungsebenen mit unterschiedlichen Verantwortlichkeiten:
+
+Ebene	Gegenstand	Typische Operationen
+Device Hardware Control	Virtuelle Hardware des emulierten Geräts	Power on/off, Reset, Boot, USB-Peripheral aktivieren/deaktivieren
+Virtual Host Controller Control	VirtUSB-Controller und virtuelle Topologie	Device erzeugen, Port zuweisen, Attach/Detach, Hub-Topologie verwalten
+USB Protocol	Normales USB-Verhalten zwischen Host und Device	Enumeration, Control/Bulk/Interrupt/Isochronous Transfers, STALL, Suspend/Resume
+Beispiel
+
+Ein emuliertes Gerät könnte selbst einen Power-Off auslösen:
+
+Device Hardware Control
+    Device power off
+             ↓
+Virtual Host Controller Control
+    Port remains assigned
+    Device becomes electrically absent
+             ↓
+USB Protocol
+    Pending transfers terminate
+    Linux observes disconnect
+    USB device state is discarded
+
+Beim erneuten Einschalten:
+
+Device Hardware Control
+    Device power on
+    USB peripheral becomes active
+             ↓
+Virtual Host Controller Control
+    Device is still assigned to the same port
+    Connection is signalled
+             ↓
+USB Protocol
+    Linux starts enumeration
+Entscheidender Unterschied
+Hardware Control
+
+Hier handelt das emulierte Gerät beziehungsweise sein Backend aus eigener Motivation:
+
+ausschalten,
+neu starten,
+USB-Hardware deaktivieren,
+Bootloader starten.
+Virtual Host Controller Control
+
+Hier wird die virtuelle Infrastruktur verwaltet:
+
+welchem Controller gehört das Device,
+an welchem Port steckt es,
+ist es topologisch attached,
+welches Parent-Hub/Port-Paar wird verwendet.
+
+Das ist eher die VirtUSB Management/Control Plane.
+
+USB Protocol
+
+Hier handelt niemand mehr „außerhalb von USB“. Hier läuft das standardisierte USB-Verhalten:
+
+Requests,
+Responses,
+Transfers,
+Zustände nach USB-Spezifikation.
+Begriffe
+
+Ich würde vorläufig diese Bezeichnungen verwenden:
+
+Device Hardware Control
+Virtual Host Controller Control
+USB Protocol Operation
+
+USB Controller Control wäre zwar verständlich, aber potenziell mehrdeutig: Es könnte sowohl den virtuellen Host Controller als auch den USB Device Controller im Backend meinen. Virtual Host Controller Control grenzt die Ebene eindeutig ab.
+
+Damit wird auch die ursprüngliche Frage sauber beantwortet:
+
+Das Backend darf seine eigene virtuelle Gerätehardware steuern. VirtUSB verwaltet die daraus resultierenden Änderungen am virtuellen Host Controller. Der Linux-USB-Stack verarbeitet anschließend die USB-seitigen Folgen.
+
+Angenommen, wir führen die drei Schichten ein. Dann müssten wir wahrscheinlich alle bestehenden Dokumente nochmals anfassen. Insbesondere die in doc/architecture.
+
+Ja. Falls wir diese drei Ebenen als verbindliches Architekturmodell einführen, wäre das keine kleine Ergänzung mehr, sondern eine dokumentübergreifende Präzisierung der Architektur.
+
+Betroffene Dokumente
+Zwingend anzupassen
+
+High-Level Architecture
+
+Dort müsste das Schichtenmodell ausdrücklich eingeführt werden:
+
+Device Hardware Control
+Virtual Host Controller Control
+USB Protocol Operation
+
+Außerdem müssten die Verantwortungsgrenzen und die Wirkungsrichtung zwischen diesen Ebenen beschrieben werden.
+
+Backend Requirements
+
+Das Backend-Dokument müsste klar trennen zwischen:
+
+Steuerung der eigenen virtuellen Gerätehardware,
+Anforderung von Änderungen an der virtuellen Host-Controller-/Topologieebene,
+Verarbeitung normalen USB-Protokollverhaltens.
+
+Insbesondere Kapitel 7 bis 10 wären betroffen.
+
+Software Requirements
+
+Die Verantwortlichkeiten von Kernelmodul, Userspace und Backend müssten gegen diese drei Ebenen abgeglichen werden. Wahrscheinlich wären keine großen Umbauten nötig, aber die Begriffe müssten explizit und konsistent zugeordnet werden.
+
+Wahrscheinlich anzupassen
+
+System Requirements
+
+Nur falls das dreischichtige Modell dort bereits sichtbar sein soll. Inhaltlich ist es eher eine Architekturentscheidung als eine Systemanforderung. Vermutlich genügt ein Konsistenzcheck; eine Änderung ist nicht zwingend.
+
+Definitions and Abbreviations aller Dokumente
+
+Begriffe wie diese müssten eindeutig definiert werden:
+
+device hardware state
+virtual device
+backend instance
+device attachment
+USB connection state
+virtual host controller control
+USB protocol state
+Künftige Dokumente
+
+Die drei Ebenen würden die Grundlage bilden für:
+
+Kernel/User Interface Specification
+Userspace Communication Protocol
+Ownership & Memory Model
+Transfer Queue & Scheduling Model
+Synchronization & Concurrency Design
+
+Dort wäre die Trennung besonders wertvoll, weil sie verhindert, dass Topologieoperationen, Hardwarezustände und USB-Transfers in einer einzigen unscharfen API vermischt werden.
+
+Kritische Bewertung
+
+Technisch empfohlen:
+Die drei Verantwortungsbereiche klar unterscheiden.
+
+Technisch problematisch:
+Sie sofort als vollständig ausgearbeitete, starre „Schichtenarchitektur“ festschreiben. Noch ist nicht abschließend geklärt, welche Operation exakt zu welcher Ebene gehört und wie die Übergänge aussehen.
+
+Beispielsweise ist noch zu definieren:
+
+Ist „USB peripheral enabled/disabled“ Device Hardware Control oder bereits USB connection state?
+Wer übersetzt power off in einen hostseitig beobachtbaren Disconnect?
+Ist Port-Connect-Status ausschließlich Controllerzustand oder teilweise Backendzustand?
+Darf ein Backend nur Hardwarezustände melden oder unmittelbar Topologieaktionen anfordern?
+Empfehlung für das geplante Review
+
+Ich würde das bevorstehende Gesamtreview nutzen, um zunächst ein Begriffs- und Verantwortungsmodell zu erstellen, noch keine umfangreichen Textänderungen.
+
+Ein mögliches Review-Artefakt:
+
+# VirtUSB Responsibility Model
+
+## Device Hardware Control
+
+- ...
+
+## Virtual Host Controller Control
+
+- ...
+
+## USB Protocol Operation
+
+- ...
+
+## Cross-Layer Effects
+
+- ...
+
+Erst wenn dieses Modell akzeptiert ist, werden die bestehenden Dokumente gezielt angepasst.
+
+Damit vermeiden wir, alle Dateien mehrfach umzubauen, während die Begriffe noch in Bewegung sind. Deine Einschätzung ist aber richtig: Wird dieses Modell verbindlich, müssen insbesondere die Dokumente unter doc/architecture/ und die Backend Requirements nochmals konsistent überarbeitet werden.
+
+Wobei ich der Meinung bin, dass es sinnvoll ist, sie einzufügen. Und zwar zum jetzigen Zeitpunkt.
+
+Ja. Ich halte es ebenfalls für sinnvoll, diese Trennung jetzt einzuführen.
+
+Der Aufwand ist zwar spürbar, aber der Zeitpunkt ist günstig:
+
+Die Requirements sind gerade erst fertiggestellt.
+Die konkreten Schnittstellen und Protokolle existieren noch nicht.
+Es gibt noch keine Implementierung, die auf einem unscharfen Zustandsmodell basiert.
+Die vier Dokumente sind noch überschaubar und konsistent änderbar.
+
+Später würde diese Präzisierung APIs, Nachrichtenformate, Zustandsautomaten, Ownership und Tests betreffen. Dann wäre die Korrektur wesentlich teurer.
+
+Allerdings: eher Verantwortungsbereiche als klassische Schichten
+
+Ich würde sie vorläufig nicht als strikt übereinanderliegende technische Schichten modellieren. Die drei Bereiche sind zwar kausal miteinander verbunden, haben aber unterschiedliche Akteure und Zustandsräume:
+
+Virtual Device Hardware
+Virtual Host Controller and Topology
+USB Protocol Operation
+
+Das vermeidet die Mehrdeutigkeit von „Control“ und beschreibt jeweils den Gegenstand.
+
+1. Virtual Device Hardware
+
+Bildet das Verhalten der Gerätehardware außerhalb des eigentlichen USB-Protokolls ab:
+
+Geräteinstanz existiert oder wird zerstört
+Versorgung ein/aus
+Geräte-Reset oder Neustart
+USB-Device-Controller beziehungsweise Transceiver aktiv/inaktiv
+Bootloader-/Firmwarezustand, soweit USB-seitig relevant
+
+Die Backend-Instanz darf ausschließlich die virtuelle Hardware des von ihr repräsentierten Geräts steuern.
+
+2. Virtual Host Controller and Topology
+
+Verwaltet die Infrastruktur, in der das Gerät steckt:
+
+Controller und Root Hub
+Parent-Hub und Port
+Portzuordnung
+Attach und Detach
+virtuelle USB-Topologie
+aus Hardwarezuständen resultierende Connection Changes
+
+Diese Ebene gehört nicht dem Backend. Das Backend kann relevante Änderungen anfordern oder melden; die Control Plane führt sie kontrolliert aus.
+
+3. USB Protocol Operation
+
+Bildet das standardisierte USB-Verhalten ab:
+
+Enumeration
+USB-Gerätezustände
+Reset, Suspend und Resume
+Control-, Bulk-, Interrupt- und Isochronous-Transfers
+STALL und Transferstatus
+Hub-Class-Verhalten
+
+Hier sollte ausschließlich USB-konformes Verhalten sichtbar sein.
+
+Kausalität
+
+Beispiele:
+
+Device power off
+→ device remains assigned to its port
+→ host-visible connection disappears
+→ Linux discards the USB protocol state
+Device power on
+→ device is still assigned to the same port
+→ host-visible connection appears
+→ Linux enumerates the device again
+Cable detached
+→ topological association is removed
+→ host-visible connection disappears
+→ device hardware instance may continue to exist
+
+Damit werden drei bisher leicht vermischbare Sachverhalte getrennt:
+
+Existiert und läuft die virtuelle Gerätehardware?
+Wo ist das Gerät in der virtuellen Host-Topologie angeschlossen?
+In welchem USB-Protokollzustand befindet es sich?
+Konsequenz für die bestehenden Dokumente
+
+Ich würde jetzt ein dokumentübergreifendes Review starten und die Dateien in dieser Reihenfolge bearbeiten:
+
+1. High-Level Architecture
+
+Hier muss das Modell zuerst verbindlich definiert werden. Vermutlich betroffen:
+
+System-/Komponentenübersicht
+Verantwortungsgrenzen
+Device- und Backend-Modell
+Controller- und Topologiemodell
+mindestens ein neues Mermaid-Diagramm
+Glossar
+2. System Requirements
+
+Nur prüfen und gegebenenfalls knapp ergänzen. Das Schichtenmodell selbst ist Architektur, aber das System sollte die zugrunde liegenden Fähigkeiten fordern:
+
+virtuelle Ein-/Aussteckvorgänge
+wiederholtes Disconnect/Reconnect
+hostseitig beobachtbares Verhalten entsprechend realer Hardware
+
+Keine API- oder Zustandsdetails.
+
+3. Software Requirements
+
+Hier müssen die Verantwortlichkeiten eindeutig zugeordnet werden:
+
+Backend: eigene virtuelle Device-Hardware
+Userspace: Koordination und Control Plane
+Kernelmodul: Host Controller, Ports, Topologie und Linux-USB-Integration
+alle Komponenten: USB-Protokollfluss entsprechend ihrer Rolle
+4. Backend Requirements
+
+Kapitel 7 bis 10 müssen geprüft und vermutlich angepasst werden:
+
+Backend lifecycle ≠ device hardware lifecycle
+Device creation/removal ≠ power on/off
+Attach/detach ≠ USB presence
+Backend darf nur die eigene virtuelle Hardware beeinflussen
+daraus resultierende Host-Controller-Änderungen laufen über die dokumentierte Schnittstelle
+USB-Transfers bleiben davon getrennt
+Empfohlene Vorgehensweise
+
+Ich würde nicht sofort punktuell Text in allen Dateien ergänzen. Stattdessen:
+
+Begriffsmodell als Stub erstellen
+Begriffe und Zustände gemeinsam akzeptieren
+High-Level Architecture überarbeiten
+Requirements-Dokumente nacheinander konsistent anpassen
+abschließender dokumentübergreifender Format- und Konsistenzcheck
+ADR-Kandidaten erfassen
+
+Der erste Stub könnte so aussehen:
+
+# VirtUSB Control and Behaviour Model
+
+## 1. Virtual Device Hardware
+
+- Scope
+- Responsibilities
+- Hardware lifecycle
+- Power state
+- USB hardware availability
+- Backend authority
+
+## 2. Virtual Host Controller and Topology
+
+- Controller ownership
+- Device-to-port association
+- Attach and detach
+- USB topology
+- Connection-state propagation
+- Management authority
+
+## 3. USB Protocol Operation
+
+- Enumeration
+- USB device states
+- Transfer processing
+- USB-defined events
+- Separation from implementation details
+
+## 4. Cross-Layer Behaviour
+
+- Device power-off while attached
+- Device power-on while attached
+- USB hardware disable and enable
+- Cable detach and reattach
+- Reset and reboot
+- Effects on pending transfers
+
+Ich würde diesen Stub zunächst als Arbeitsmodell behandeln. Nach der Annahme wird der Inhalt in die High-Level Architecture integriert; ein dauerhaftes fünftes Requirements-Dokument ist dafür wahrscheinlich nicht nötig.
+```
