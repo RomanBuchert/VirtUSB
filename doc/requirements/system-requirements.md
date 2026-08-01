@@ -15,67 +15,107 @@
 9. Constraints
 10. Explicit Non-Goals
 11. Verification
+
 Appendix A – Requirement Traceability
+
+Appendix B – Reference Documents
 
 # 1. Purpose
 
 This document defines the system requirements for VirtUSB.
 
-The requirements describe **what** the VirtUSB system shall provide without
+The requirements specify **what** the VirtUSB system shall provide without
 specifying **how** these requirements are implemented.
 
-This document is primarily intended for developers, architects and reviewers
-participating in the design and implementation of VirtUSB.
+This document is intended primarily for developers, architects, reviewers, and
+contributors involved in the design, implementation, verification, and
+maintenance of VirtUSB.
 
-Implementation details are specified in other project documents, including the
-High-Level Architecture, the Software Requirements and the Architecture
-Decision Records (ADRs).
+Implementation details are defined in separate project documents, including the
+System Overview, the High-Level Architecture, Architecture Decision Records
+(ADRs), and subsequent design specifications.
 
-This document intentionally does not specify implementation details,
-algorithms, data structures, interfaces or other design decisions.
+This document intentionally does not define:
 
+- implementation details
+- software architecture
+- algorithms
+- data structures
+- communication protocols
+- interface definitions
+- implementation-specific synchronization mechanisms
+- other design decisions
+
+These topics are addressed by the corresponding architecture and design
+documents.
 ---
 
 # 2. Scope
 
 VirtUSB is a Linux-based software system providing one or more virtual USB Host
-Controllers for developing, testing, and validating USB devices without
-requiring dedicated physical USB hardware.
+Controllers for developing, testing, simulating, and validating USB devices
+without requiring corresponding physical USB hardware.
 
-VirtUSB operates exclusively within the Linux environment. The system consists
-of an out-of-tree Linux kernel module together with supporting userspace
-components.
+VirtUSB operates exclusively within the Linux environment.
+
+The system consists of an out-of-tree Linux kernel module together with
+supporting userspace software.
 
 The scope of VirtUSB includes:
 
 - virtual USB Host Controller infrastructure
 - virtual Root Hub implementation
-- downstream port management
+- hierarchical virtual USB topology
+- parent hub and parent port management
+- Controller Interface
 - kernel-userspace communication
-- virtual USB device backend integration
+- backend integration
 - USB transfer and bus event transport
 
 VirtUSB interfaces with the Linux USB subsystem on one side and userspace
 components on the other.
 
+```mermaid
+flowchart LR
+   subgraph linux["Linux"]
+      usb["Linux USB Subsystem"]
+      virtusb["VirtUSB Kernel Module"]
+   end
+
+   subgraph userspace["Userspace"]
+      control["Control Software"]
+      backend["Backend"]
+      hardware["Virtual Device Hardware"]
+   end
+
+   usb <--> virtusb
+   control <--> virtusb
+   backend <--> virtusb
+   backend -->|"represents"| hardware
+```
+
 The following are outside the scope of VirtUSB:
 
 - implementation of the Linux USB subsystem
 - backend-specific implementation details
+- device-specific USB behaviour
 - USB device application logic
 - physical USB hardware
 - non-Linux operating systems
 
-VirtUSB is intended for developers, testers, and automated test environments
-requiring virtual USB hardware for software development and validation.
+VirtUSB is intended for developers, testers, continuous integration systems,
+and automated test environments requiring virtual USB hardware for software
+development, validation, and regression testing.
 
 Typical use cases include:
 
 - USB device development
+- software-defined USB device prototyping
 - automated testing
 - regression testing
 - protocol validation
 - USB software integration testing
+- backend development
 
 ---
 
@@ -88,14 +128,22 @@ The terminology and abbreviations used by this document are defined in
 
 # 4. References
 
-This document is based on the following references.
+This document is based on the following project documents and external
+references.
 
-Project-specific documents define the VirtUSB architecture and its evolution.
-External references provide the technical background and platform-specific
-requirements relevant to this specification.
+Project-specific documents define the VirtUSB architecture, terminology, and
+engineering process. External references provide the technical background and
+platform-specific requirements relevant to this specification.
 
+## 4.1 Project Documents
+
+- VirtUSB Glossary
+- VirtUSB System Overview
 - VirtUSB High-Level Architecture
-- Architecture Decision Records (ADRs)
+- VirtUSB Architecture Decision Records (ADRs)
+
+## 4.2 External References
+
 - Universal Serial Bus Specification, Revision 2.0
 - Linux Kernel Documentation
 - Linux USB Subsystem Documentation
@@ -105,55 +153,79 @@ requirements relevant to this specification.
 # 5. System Overview
 
 This section provides a high-level overview of the problem addressed by VirtUSB
-and the environment in which the system operates.
+and the operational context in which the system is intended to be used.
+
+Detailed architectural concepts, responsibility layers, runtime objects, and
+communication models are defined by the System Overview and the High-Level
+Architecture documents.
 
 ## 5.1 Problem Statement
 
-Developing and testing USB devices traditionally requires dedicated physical
-USB hardware. This increases development effort, complicates automated testing,
-and makes it difficult to reproduce specific USB scenarios consistently.
+Developing, testing, and validating USB devices traditionally requires
+dedicated physical USB hardware.
 
-Existing approaches typically rely on either physical hardware, software
-simulation with limited integration into the operating system, or specialized
-hardware test equipment. These approaches often lack flexibility, require
-additional hardware, or do not present virtual USB devices through the standard
-Linux USB subsystem.
+This increases development effort, complicates automated testing, and makes it
+difficult to reproduce specific USB scenarios consistently.
 
-VirtUSB addresses these limitations by providing virtual USB Host Controllers
-that allow software-defined USB devices to behave like physical USB devices
-from the perspective of the Linux operating system.
+Existing approaches typically rely on one or more of the following:
+
+- physical USB hardware
+- software simulation with limited operating-system integration
+- specialized USB test equipment
+
+These approaches often lack flexibility, require additional hardware, or do not
+allow virtual USB devices to participate in the standard Linux USB subsystem as
+regular USB devices.
+
+VirtUSB addresses these limitations by providing one or more virtual USB Host
+Controllers that allow software-defined Virtual Device Hardware to appear as
+standard USB devices from the perspective of the Linux operating system.
 
 Typical use cases include:
 
 - USB device development
+- software-defined USB device prototyping
 - automated testing
 - regression testing
 - protocol validation
 - USB software integration testing
+- backend development
 
 ```mermaid
 flowchart LR
-   linux["Linux USB Subsystem"]
-   virt["VirtUSB"]
-   iface["Userspace Interface"]
-   backend["Backend"]
 
-   linux <--> virt
-   virt <--> iface
-   iface <--> backend
+   subgraph linux["Linux"]
+      usb["Linux USB Subsystem"]
+      virtusb["VirtUSB Kernel Module"]
+   end
+
+   subgraph userspace["Userspace"]
+      control["Control Software"]
+      backend["Backend"]
+      hardware["Virtual Device Hardware"]
+   end
+
+   usb <--> virtusb
+   control <--> virtusb
+   backend <--> virtusb
+   backend -->|"represents"| hardware
 ```
 
 ## 5.2 System Context
 
-VirtUSB operates as a Linux kernel module and integrates with the Linux USB
-subsystem through the standard Host Controller Driver (HCD) interface.
+VirtUSB operates as an out-of-tree Linux kernel module and integrates with the
+Linux USB subsystem through the standard Host Controller Driver (HCD)
+interface.
 
-Userspace components manage virtual controllers and communicate with backend
-implementations that provide the behaviour of virtual USB devices.
+Userspace software communicates with individual controller instances through
+the Controller Interface.
 
-From the perspective of the Linux operating system, applications and diagnostic
-tools interact with virtual USB devices through the standard Linux USB
-infrastructure without requiring VirtUSB-specific support.
+Backend instances represent Virtual Device Hardware and provide device-specific
+USB behaviour.
+
+From the perspective of the Linux operating system, applications, USB device
+drivers, and diagnostic tools interact with virtual USB devices through the
+standard Linux USB infrastructure without requiring VirtUSB-specific support.
 
 Typical external tools include:
 
@@ -164,25 +236,36 @@ Typical external tools include:
 
 ---
 
+
 # 6. Functional Requirements
 
 ```mermaid
 mindmap
   root((Functional Requirements))
-    Controllers
-    Devices
-    Enumeration
-    Transfers
+    Controller Infrastructure
+    USB Topology
+      Parent Hubs
+      Parent Ports
+      Association
+      Attachment
+      Connection
+    Virtual Device Hardware
+    USB Protocol
+      Enumeration
+      Control
+      Bulk
+      Interrupt
+      Isochronous
     Backend
-    Userspace
-    Errors
+    Controller Interface
+    Error Handling
 ```
 
 This section defines the functional requirements of VirtUSB. These requirements
 describe the externally observable behaviour of the system without specifying
 implementation details.
 
-## 6.1 Virtual Host Controllers
+## 6.1 Controller Infrastructure
 
 VirtUSB shall support one or more virtual USB Host Controllers.
 
@@ -191,32 +274,55 @@ The system shall allow the number of virtual Host Controllers to be configured.
 Each virtual Host Controller shall operate independently of all other
 controllers.
 
-Each controller shall maintain its own runtime state, communication interface,
-and virtual USB bus.
+Each controller shall maintain its own runtime state, Controller Interface, and
+virtual USB topology.
 
 The creation, initialization, and removal of controllers shall be supported
-through the documented userspace interface.
+through the documented Controller Interface.
 
-## 6.2 Virtual USB Devices
+## 6.2 USB Topology
 
-VirtUSB shall support software-defined virtual USB devices.
+VirtUSB shall support a hierarchical virtual USB topology.
 
-Each virtual USB device shall be represented by a backend implementation.
+Each controller shall provide exactly one virtual Root Hub.
 
-A backend may exist independently of any controller or port assignment.
+The Root Hub shall initially expose exactly 31 downstream ports.
 
-Each backend may be associated with at most one downstream port at any point in
-time.
+Additional parent ports may be provided by virtual USB hubs.
 
-Each downstream port shall support at most one associated backend.
+Each parent port shall belong to exactly one parent hub.
 
-Associating a backend with a port shall not automatically make the
-corresponding virtual USB device visible to the operating system.
+Each parent port shall support at most one attached virtual USB device.
+
+The system shall distinguish between:
+
+- association
+- attachment
+- connection
+- enumeration
+
+## 6.3 Virtual Device Hardware
+
+VirtUSB shall support software-defined Virtual Device Hardware.
+
+Each Virtual Device Hardware instance shall be represented by exactly one
+backend instance.
+
+A backend instance may exist independently of any controller or parent-port
+assignment.
+
+Each backend instance may be associated with at most one parent port at any
+point in time.
+
+Each parent port shall support at most one associated backend instance.
+
+Associating a backend instance with a parent port shall not automatically make
+the corresponding virtual USB device visible to the operating system.
 
 The system shall support attaching and detaching virtual USB devices without
 requiring controller recreation.
 
-## 6.3 Device Enumeration
+## 6.4 Device Enumeration
 
 Virtual USB devices shall be enumerated through the standard Linux USB
 enumeration process.
@@ -227,17 +333,16 @@ subsystem.
 Standard Linux tools shall be able to discover and inspect virtual USB devices
 without requiring VirtUSB-specific modifications.
 
-The observable enumeration behaviour shall be consistent with that of
-equivalent physical USB devices within the limitations of a software-based
-implementation.
+The observable enumeration behaviour shall be consistent with equivalent
+physical USB devices within the limitations of a software-only implementation.
 
-## 6.4 USB Transfers
+## 6.5 USB Transfers
 
-VirtUSB shall support all USB transfer types required by the USB 2.0
+VirtUSB shall support all USB transfer types defined by the USB 2.0
 specification.
 
 The system shall transport USB transfers between the Linux USB subsystem and
-the associated backend.
+the associated backend instance.
 
 Each submitted transfer shall eventually reach exactly one terminal state:
 
@@ -245,30 +350,29 @@ Each submitted transfer shall eventually reach exactly one terminal state:
 - completed with an error
 - cancelled
 
-## 6.4.1 Control Transfers
+### 6.5.1 Control Transfers
 
-The system shall support USB control transfers required for device
+The system shall support USB Control transfers required for device
 initialization, enumeration, and normal operation.
 
-Standard USB requests defined by the USB specification shall be supported
-through backend implementations.
+Standard USB requests shall be handled by backend implementations.
 
-## 6.4.2 Bulk Transfers
+### 6.5.2 Bulk Transfers
 
-The system shall support USB bulk transfers.
+The system shall support USB Bulk transfers.
 
 Bulk transfers shall preserve the ordering required by the USB specification.
 
-## 6.4.3 Interrupt Transfers
+### 6.5.3 Interrupt Transfers
 
-The system shall support USB interrupt transfers.
+The system shall support USB Interrupt transfers.
 
 Interrupt transfers shall behave consistently with the USB specification within
 the limitations of the execution environment.
 
-## 6.4.4 Isochronous Transfers
+### 6.5.4 Isochronous Transfers
 
-The system shall support USB isochronous transfers.
+The system shall support USB Isochronous transfers.
 
 Isochronous transfers shall preserve the functional behaviour defined by the
 USB specification.
@@ -276,12 +380,12 @@ USB specification.
 The system shall not guarantee hard real-time timing or deterministic USB frame
 scheduling.
 
-## 6.5 Backend Interaction
+## 6.6 Backend
 
 VirtUSB shall remain independent of any specific backend implementation.
 
 Backend implementations shall communicate exclusively through the documented
-userspace interface.
+Controller Interface.
 
 Backend implementations shall be responsible for all device-specific USB
 behaviour.
@@ -289,76 +393,96 @@ behaviour.
 The system shall support different backend implementations provided they comply
 with the documented interface.
 
-## 6.6 Userspace Interaction
+## 6.7 Controller Interface
 
-The system shall provide a documented userspace interface for managing virtual
+The system shall provide a documented Controller Interface for managing virtual
 USB controllers and virtual USB devices.
 
-The userspace interface shall support controller management operations.
+The Controller Interface shall support:
 
-The userspace interface shall support backend association and device management
-operations.
+- controller management
+- backend association
+- device attachment and detachment
+- topology management
+- USB transfer exchange
+- lifecycle-event notification
 
-The userspace interface shall support notification of relevant USB bus and
-device lifecycle events.
-
-## 6.7 Error Handling
+## 6.8 Error Handling
 
 The system shall detect invalid operations affecting controller management,
-device management, and backend interaction.
+topology management, device management, and backend interaction.
 
-Backend failures shall not compromise the operation of unrelated virtual Host
-Controllers.
+Backend failures shall not compromise unrelated virtual Host Controllers.
 
 The system shall restore a consistent runtime state following communication
-failures, backend termination, or device removal.
+failures, backend termination, topology changes, or device removal.
 
-The system shall report errors through the documented userspace interface.
+The system shall report errors through the documented Controller Interface.
 
 The system shall ensure that resources associated with failed or terminated
 operations are released in a controlled manner.
 
 ---
 
-# 7. Interface Requirements
+## 7. Interface Requirements
 
-This section defines the interface requirements between the VirtUSB kernel
-module and userspace components.
+This section defines the requirements for the Controller Interface between the
+VirtUSB kernel module and userspace components.
 
-The requirements describe the logical interface exposed by VirtUSB without
-mandating a specific communication mechanism or protocol.
+The requirements describe the logical Controller Interface without mandating a
+specific communication mechanism, transport protocol, or serialization format.
 
-The interface shall provide communication between the VirtUSB kernel module and
-userspace components.
+The Controller Interface shall provide communication between individual
+VirtUSB controller instances and userspace components.
 
-Backend implementations shall communicate with the kernel module exclusively
-through the documented interface.
+Backend implementations and control software shall communicate with the
+VirtUSB kernel module exclusively through the documented Controller Interface.
 
-The interface shall remain independent of any specific backend implementation,
-programming language, or userspace framework.
+The Controller Interface shall remain independent of any specific backend
+implementation, programming language, userspace framework, or execution model.
 
-The interface shall support concurrent communication with multiple independent
-virtual Host Controllers.
+The Controller Interface shall support concurrent communication with multiple
+independent virtual Host Controllers.
 
-The interface shall provide the operations required for:
+The Controller Interface shall provide the operations required for:
 
 - controller management
+- topology management
 - backend association
 - device attachment and detachment
 - USB transfer exchange
 - lifecycle management
 
-The interface shall support asynchronous notification of relevant USB bus,
-controller, and device lifecycle events.
+The Controller Interface shall support asynchronous notification of relevant:
 
-The interface shall provide a documented mechanism for reporting operational
-errors and communication failures.
+- USB bus events
+- controller lifecycle events
+- topology changes
+- device lifecycle events
 
-The interface shall provide sufficient information to allow userspace
-components to identify the affected controller, virtual device, or transfer.
+The Controller Interface shall provide a documented mechanism for reporting:
 
-Changes affecting the documented interface shall preserve backward
-compatibility whenever reasonably practical.
+- operational errors
+- communication failures
+- backend failures
+- topology-related failures
+
+The Controller Interface shall provide sufficient information to allow
+userspace components to identify the affected:
+
+- controller instance
+- parent hub
+- parent port
+- backend instance
+- virtual USB device
+- USB transfer
+
+The Controller Interface shall support future functional extension while
+preserving backward compatibility whenever reasonably practical.
+
+The detailed communication protocol, message formats, transport mechanisms, and
+versioning strategy are defined separately and are outside the scope of this
+requirements specification.
 
 ---
 
@@ -371,26 +495,29 @@ expected from the system.
 ## 8.1 Performance
 
 VirtUSB shall provide sufficient performance for interactive USB device
-development, testing, and validation.
+development, testing, simulation, and validation.
 
-The system shall support concurrent operation of multiple virtual Host
-Controllers.
+The system shall support concurrent operation of multiple independent virtual
+Host Controllers.
 
 Performance shall scale with the configured number of controller instances
 within the practical limitations of the underlying Linux system.
+
+The architecture shall not require unnecessary synchronization between
+independent controller instances.
 
 ## 8.2 Reliability
 
 VirtUSB shall operate reliably during continuous use.
 
-Failures affecting one virtual Host Controller or backend shall not compromise
-the operation of unrelated controller instances.
+Failures affecting one virtual Host Controller, backend instance, or Virtual
+Device Hardware instance shall not compromise unrelated controller instances.
 
 The system shall detect communication failures and restore a consistent runtime
 state.
 
-The system shall support controlled recovery following backend termination or
-device removal.
+The system shall support controlled recovery following backend termination,
+topology changes, communication failures, or device removal.
 
 ## 8.3 Maintainability
 
@@ -398,15 +525,15 @@ VirtUSB shall be designed to support long-term maintenance and future
 development.
 
 The project shall maintain up-to-date technical documentation describing the
-system architecture and public interfaces.
+system requirements, architecture, public interfaces, and terminology.
 
 Architectural decisions shall be documented using Architecture Decision Records
 (ADRs).
 
 The implementation shall follow a consistent coding style.
 
-Static analysis tools shall be used to improve code quality and detect potential
-defects.
+Static analysis tools shall be used to improve code quality and detect
+potential defects.
 
 The software architecture shall remain modular to facilitate future extension
 and maintenance.
@@ -421,6 +548,9 @@ The project shall support GCC and LLVM/Clang toolchains.
 Platform-specific implementation details shall be minimized where reasonably
 practical.
 
+Backend implementations shall remain independent of processor architecture
+where practical.
+
 ## 8.5 Security
 
 VirtUSB shall operate within the Linux security model.
@@ -428,10 +558,10 @@ VirtUSB shall operate within the Linux security model.
 The system shall not require privileges beyond those necessary for operating a
 Linux kernel module.
 
-The documented userspace interface shall validate externally supplied input
+The documented Controller Interface shall validate externally supplied input
 before processing.
 
-Trust relationships between kernel-space and userspace shall be explicitly
+Trust relationships between kernel space and userspace shall be explicitly
 defined.
 
 ## 8.6 Testability
@@ -446,6 +576,9 @@ components.
 Automated testing shall be supported to facilitate regression testing and
 continuous integration.
 
+The architecture shall support isolated verification of controller
+infrastructure, USB topology, backend interaction, and transfer handling.
+
 ## 8.7 Compatibility
 
 VirtUSB shall maintain compatibility with supported Linux kernel versions.
@@ -454,6 +587,9 @@ Public interfaces shall remain stable whenever reasonably practical.
 
 Changes affecting documented public interfaces shall preserve backward
 compatibility whenever reasonably practical or shall be documented accordingly.
+
+The Controller Interface shall support controlled future extension without
+requiring unnecessary changes to existing userspace applications.
 
 ---
 
@@ -470,8 +606,12 @@ VirtUSB shall target Linux systems exclusively.
 The kernel component shall be implemented as an out-of-tree Linux kernel
 module.
 
-The project shall rely only on interfaces intended for external kernel modules
-where reasonably practical.
+The project shall rely on the standard Linux Host Controller Driver (HCD)
+infrastructure and use interfaces intended for external kernel modules wherever
+reasonably practical.
+
+The implementation shall follow established Linux kernel development
+conventions where applicable.
 
 ## 9.2 Technology Constraints
 
@@ -484,6 +624,9 @@ DKMS integration may be provided to simplify installation on supported Linux
 systems.
 
 Project documentation shall be maintained in Markdown format.
+
+Mermaid diagrams may be used to document architectural relationships and system
+behaviour.
 
 ## 9.3 Licensing Constraints
 
@@ -509,8 +652,10 @@ VirtUSB is **not** intended to provide:
 
 - physical USB Host Controller implementations
 - USB device firmware
+- implementation of device-specific USB behaviour
 - virtual USB device emulation outside the Linux operating system
 - replacement, modification, or reimplementation of the Linux USB subsystem
+- mandatory backend framework or programming model
 - custom USB protocol analysis or protocol capture functionality
 - hard real-time guarantees for USB isochronous transfers
 
@@ -520,10 +665,18 @@ VirtUSB is **not** intended to provide:
 
 ```mermaid
 flowchart LR
-   Req[Requirement] --> Review
-   Review --> Analysis
-   Analysis --> Tests
-   Tests --> Traceability
+   Req["System Requirement"]
+   Review["Technical Review"]
+   Analysis["Static Analysis"]
+   Test["Verification Testing"]
+   Trace["Traceability"]
+
+   Req --> Review
+   Req --> Analysis
+   Req --> Test
+   Review --> Trace
+   Analysis --> Trace
+   Test --> Trace
 ```
 
 This section defines how compliance with the system requirements is verified.
@@ -534,6 +687,7 @@ documented verification methods.
 Verification methods may include:
 
 - technical review
+- architecture review
 - static analysis
 - unit testing
 - integration testing
@@ -547,10 +701,24 @@ Each requirement shall be assigned a unique identifier.
 Verification artifacts shall reference the corresponding requirement
 identifier.
 
-Where applicable, verification artifacts shall also reference the corresponding
-Architecture Decision Records (ADRs).
+Where applicable, verification artifacts shall also reference:
+
+- the corresponding High-Level Architecture section
+- the corresponding Architecture Decision Record (ADR)
 
 Requirement traceability shall be maintained throughout the project lifecycle.
+
+The project shall maintain traceability between:
+
+- system requirements
+- architecture documentation
+- Architecture Decision Records
+- implementation
+- verification artifacts
+
+The traceability model shall support demonstrating that each implemented
+requirement has been verified using one or more documented verification
+activities.
 
 ---
 

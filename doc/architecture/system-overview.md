@@ -1,14 +1,35 @@
 # VirtUSB System Overview
 
+# Table of Contents
+
+1. Purpose
+2. System Objective
+3. System Context
+4. Architectural Responsibility Layers
+5. Principal Software Components
+6. System Boundary
+7. Typical Operational Flow
+8. Transfer Model
+9. Timing Model
+10. Deployment View
+11. Interfaces
+12. Project Scope
+13. Out of Scope
+14. Architectural Constraints
+15. Relationship to the High-Level Architecture
+
 # 1. Purpose
 
 This document provides a high-level overview of VirtUSB.
 
-It describes the system context, the principal components, their responsibilities,
-and the boundaries between VirtUSB and virtual USB device backends.
+It describes the system context, the principal software components, the
+architectural responsibility layers, the major runtime relationships, and the
+boundaries between VirtUSB and virtual USB device backends.
 
-Detailed architectural decisions are documented separately in the high-level
-architecture documentation and in Architecture Decision Records (ADRs).
+Detailed architectural models, ownership rules, runtime behaviour, communication
+semantics, failure handling, concurrency, and architectural constraints are
+defined in `doc/architecture/high-level-architecture.md` and in Architecture
+Decision Records (ADRs).
 
 ---
 
@@ -17,351 +38,531 @@ architecture documentation and in Architecture Decision Records (ADRs).
 The terminology and abbreviations used by this document are defined in
 `doc/glossary.md`.
 
+Project-wide terminology is intentionally defined in the glossary and is not
+redefined in this document.
+
 ---
 
 # 2. System Objective
 
-VirtUSB is a virtual USB Host Controller for Linux.
+VirtUSB provides one or more virtual USB Host Controllers for Linux.
 
-Its purpose is to enable the development, integration, and testing of USB devices
-without requiring physical USB device hardware.
+Its purpose is to enable development, integration, testing, simulation, and
+automation of USB devices without requiring corresponding physical USB device
+hardware.
 
-Virtual devices connected through VirtUSB are represented through the standard
-Linux USB subsystem and are intended to behave like devices attached to a physical
-USB Host Controller.
+Virtual USB devices connected through VirtUSB are represented through the
+standard Linux USB subsystem and are intended to behave like devices attached
+to a physical USB Host Controller, subject to the functional and timing
+limitations of a software-only implementation.
+
+VirtUSB shall remain independent of a specific backend implementation,
+programming language, USB device stack, userspace framework, or execution model.
 
 ---
 
 # 3. System Context
 
-VirtUSB connects virtual USB device backends to the standard Linux USB stack.
+VirtUSB connects userspace backend software to the standard Linux USB stack.
 
-The Linux USB subsystem interacts with VirtUSB as a Host Controller Driver. A
-control interface allows software outside the kernel module to create, attach,
-control, and detach virtual USB devices.
+The Linux USB subsystem interacts with VirtUSB through the Linux Host Controller
+Driver interface.
+
+Userspace interacts with a specific controller instance through the logical
+Controller Interface. A character device such as `/dev/virtusbX` may provide the
+concrete entry point for that interface.
+
+A backend instance represents exactly one Virtual Device Hardware instance.
 
 ```mermaid
 flowchart TB
-   apps[Linux Applications and USB Tools]
-   drivers[Linux USB Device Drivers]
-   usbcore[Linux USB Core]
-   virtusb[VirtUSB Kernel Module]
-   control[Control Software]
-   backend[Virtual USB Device Backend]
+   apps["Linux Applications and USB Tools"]
+   drivers["Linux USB Device Drivers"]
+   usbcore["Linux USB Core"]
+   virtusb["VirtUSB Kernel Module"]
+   interface["Controller Interface"]
+   control["Control Software"]
+   backend["Backend Instance"]
+   hardware["Virtual Device Hardware"]
 
    apps --> drivers
    drivers --> usbcore
    usbcore <--> virtusb
-   control <--> virtusb
-   control <--> backend
-   backend <--> virtusb
+   virtusb <--> interface
+   control <--> interface
+   backend <--> interface
+   backend -->|"represents"| hardware
 ```
 
-The exact communication model between the kernel module, control software, and
-backends is not defined by this document.
+The exact communication protocol, transport mechanism, message format, and
+serialization are outside the scope of this overview.
 
 ---
 
-# 4. Principal Components
+# 4. Architectural Responsibility Layers
+
+VirtUSB separates architectural responsibilities into three layers:
+
+- Virtual Device Hardware
+- Virtual Host Controller and Topology
+- USB Protocol Operation
+
+These layers describe responsibility and state boundaries. They are not
+additional software components and shall not be interpreted as implementation
+layers.
+
+```mermaid
+flowchart TB
+   subgraph protocol["USB Protocol Operation"]
+      enumeration["Enumeration"]
+      requests["USB Requests"]
+      transfers["USB Transfers"]
+   end
+
+   subgraph topology["Virtual Host Controller and Topology"]
+      controller["Virtual Host Controller"]
+      root_hub["Virtual Root Hub"]
+      ports["Parent Ports and USB Topology"]
+   end
+
+   subgraph hardware["Virtual Device Hardware"]
+      device_hw["Virtual Device Hardware Instance"]
+   end
+
+   enumeration --> controller
+   requests --> controller
+   transfers --> controller
+   controller --> root_hub
+   root_hub --> ports
+   ports --> device_hw
+```
+
+## 4.1 Virtual Device Hardware
+
+The Virtual Device Hardware layer represents the emulated hardware of one USB
+device.
+
+Typical state includes:
+
+- existence
+- power state
+- reset or reboot state
+- USB device controller availability
+- firmware or boot state where externally relevant
+
+A backend instance represents exactly one Virtual Device Hardware instance.
+
+The backend may control only the Virtual Device Hardware that it represents.
+
+## 4.2 Virtual Host Controller and Topology
+
+The Virtual Host Controller and Topology layer represents the virtual USB
+infrastructure managed by VirtUSB.
+
+It includes:
+
+- controller instances
+- Root Hubs
+- virtual USB hubs
+- parent hubs
+- parent ports
+- device association
+- device attachment and detachment
+- host-visible USB connection state
+- topology-related state changes
+
+The VirtUSB kernel module owns this layer.
+
+## 4.3 USB Protocol Operation
+
+The USB Protocol Operation layer represents USB-defined behaviour.
+
+It includes:
+
+- USB device enumeration
+- standard, class-specific, and vendor-specific requests
+- endpoint behaviour
+- Control, Bulk, Interrupt, and Isochronous transfers
+- reset, suspend, and resume behaviour
+- transfer completion and cancellation
+
+The Linux USB subsystem, VirtUSB, and the backend participate in this layer
+according to their documented responsibilities.
+
+---
+
+# 5. Principal Software Components
+
+The principal software components are:
+
+- Linux USB Core
+- VirtUSB kernel module
+- Control Software
+- Backend
+- optional `libvirtusb`
 
 ```mermaid
 flowchart LR
-   ctrl["Control Software"]
-   backend["Backend"]
+   linux["Linux USB Core"]
    kernel["VirtUSB Kernel Module"]
-   hcd["Virtual Host Controller"]
-   hub["Virtual Root Hub"]
-   linux["Linux USB Subsystem"]
+   control["Control Software"]
+   backend["Backend"]
+   library["Optional libvirtusb"]
 
-   ctrl <--> kernel
-   ctrl <--> backend
-   backend <--> kernel
-   kernel --> hcd
-   hcd --> hub
-   hub --> linux
+   linux <--> kernel
+   kernel <--> control
+   kernel <--> backend
+   control <--> backend
+   library -.optional abstraction.-> kernel
 ```
 
+## 5.1 Linux USB Core
 
-## 4.1 VirtUSB Kernel Module
+The Linux USB Core discovers and manages virtual USB devices through the
+standard Host Controller Driver interface.
+
+It remains responsible for:
+
+- bus discovery
+- device enumeration
+- address assignment
+- configuration selection
+- device-driver matching and binding
+- interaction with USB device drivers
+
+VirtUSB does not replace these responsibilities.
+
+## 5.2 VirtUSB Kernel Module
 
 The VirtUSB kernel module implements one or more virtual USB Host Controller
 instances.
 
-Its principal responsibilities are:
+Its principal responsibilities include:
 
-- integration with the Linux USB subsystem
-- creation and management of virtual Host Controller instances
-- creation and management of virtual Root Hubs and their ports
-- presentation of attached virtual USB devices to the Linux USB stack
-- forwarding USB transfers between the Linux USB subsystem and the corresponding
-  backend
-- reporting connection, disconnection, status, and transfer events
-- providing a control interface for each controller instance
+- Linux HCD integration
+- controller creation and removal
+- Root Hub creation
+- hierarchical USB topology management
+- parent-port management
+- host-visible USB connection state
+- USB request routing
+- transfer tracking, completion, and cancellation
+- userspace communication
+- controller-local resource management
+- failure cleanup
 
-The kernel module does not implement device-specific USB behaviour.
+The kernel module does not implement device-specific USB behaviour or backend-
+specific Virtual Device Hardware.
 
-## 4.2 Virtual Host Controller
+## 5.3 Virtual Host Controller
 
-A controller is one independent virtual USB Host Controller instance.
+A controller instance represents one independent virtual USB bus.
 
-Each controller:
+Each controller instance:
 
-- is represented by one character device using the naming scheme
-  `/dev/virtusbX`
-- provides exactly one virtual Root Hub
-- provides 31 downstream Root Hub ports
-- operates independently from other controller instances
+- has one Host Controller Driver instance
+- owns one virtual Root Hub
+- owns the topology rooted at that Root Hub
+- exposes one Controller Interface
+- operates independently of other controller instances
 
-The number of controller instances is configured when the kernel module is loaded.
+The number of controller instances is configured when the kernel module is
+loaded.
 
-## 4.3 Virtual Root Hub
+## 5.4 Virtual Root Hub and USB Topology
 
-Each virtual Host Controller provides exactly one virtual Root Hub.
+Each controller instance owns exactly one virtual Root Hub.
 
-The Root Hub represents the connection point between the Linux USB subsystem and
-virtual USB devices. It reports port status and port-status changes through the
-standard Linux USB Host Controller mechanisms.
+The Root Hub initially exposes exactly 31 downstream ports.
 
-Each Root Hub always exposes **31 downstream ports**. Each port operates
-independently and may have zero or one attached virtual USB device.
+Additional virtual USB hubs may extend the topology by providing further
+downstream ports.
+
+Every virtual USB device is attached to exactly one parent port. Every parent
+port belongs to exactly one parent hub and may host at most one virtual USB
+device.
 
 ```mermaid
 flowchart TD
-   HC["Virtual Host Controller"]
-   RH["Virtual Root Hub"]
+   controller["Controller Instance"]
+   root["Virtual Root Hub"]
+   root_port_1["Root Hub Port 1"]
+   root_port_2["Root Hub Port 2"]
+   hub["Virtual USB Hub"]
+   hub_port["Hub Port"]
+   device_a["Virtual USB Device A"]
+   device_b["Virtual USB Device B"]
 
-   P1["Port 1"]
-   P2["Port 2"]
-   PX["..."]
-   P31["Port 31"]
-
-   HC --> RH
-   RH --> P1
-   RH --> P2
-   RH --> PX
-   RH --> P31
+   controller --> root
+   root --> root_port_1
+   root --> root_port_2
+   root_port_1 --> device_a
+   root_port_2 --> hub
+   hub --> hub_port
+   hub_port --> device_b
 ```
 
-## 4.4 Virtual USB Device Backend
+## 5.5 Backend
 
-A backend implements the behaviour of a virtual USB device.
+A backend is a userspace software component that represents exactly one Virtual
+Device Hardware instance.
 
-Its responsibilities include, as applicable:
+Typical responsibilities include:
 
-- providing USB descriptors
-- implementing Chapter 9 request handling
-- maintaining device-specific state
-- implementing endpoint behaviour
-- processing Control, Bulk, Interrupt, and Isochronous transfers
-- producing device-specific data and responses
+- Virtual Device Hardware state
+- power and reset behaviour
+- USB descriptors
+- USB Chapter 9 request handling
+- endpoint implementation
+- class-specific request handling
+- vendor-specific request handling
+- device-specific protocol handling
+- USB transfer processing
+- generation of transfer responses
 
-VirtUSB shall not require or prefer a particular backend implementation.
+A backend does not own Host Controllers, Root Hubs, parent ports, or USB
+topology.
 
-A backend may be implemented by a userspace process, a library, a test framework,
-or another software component, provided that it uses the defined VirtUSB interface.
+A backend never communicates directly with the Linux USB subsystem.
 
-## 4.5 Control Software
+## 5.6 Control Software
 
-Control software manages virtual controllers and virtual devices through the
-VirtUSB control interface.
+Control Software manages the administrative state of controllers, backends, and
+topology through the Controller Interface.
 
-Its responsibilities may include:
+Typical responsibilities may include:
 
-- opening a controller character device
-- attaching a backend to a Root Hub port
-- detaching a virtual device
-- exchanging transfer data and events with the kernel module
-- monitoring controller, port, and device state
+- opening `/dev/virtusbX`
+- selecting a controller
+- registering a backend
+- associating Virtual Device Hardware with a parent port
+- attaching and detaching a virtual device
+- requesting or propagating hardware-state changes
+- querying controller, topology, port, and device state
+- monitoring lifecycle and error events
 
-The future `libvirtusb` library may provide a stable userspace abstraction for
-this interface. The library is not required for the initial kernel implementation.
+The control role and backend role may be implemented in the same process or in
+separate processes.
+
+## 5.7 Optional libvirtusb
+
+A future `libvirtusb` library may provide a stable userspace abstraction over
+the Controller Interface.
+
+The library is optional and is not required for the initial kernel
+implementation.
 
 ---
 
-# 5. System Boundary
+# 6. System Boundary
 
-VirtUSB is responsible for virtual Host Controller behaviour and integration with
-the Linux USB subsystem.
+VirtUSB is responsible for the virtual Host Controller infrastructure and the
+virtual USB topology.
 
-The backend is responsible for USB device behaviour.
+The backend is responsible for the Virtual Device Hardware and device-specific
+USB behaviour.
 
-```mermaid
-flowchart LR
-   subgraph linux[Linux Kernel]
-      usbcore[Linux USB Core]
-      hcd[VirtUSB HCD]
-      roothub[Virtual Root Hub]
-      ports[Virtual Ports]
-
-      usbcore <--> hcd
-      hcd <--> roothub
-      roothub <--> ports
-   end
-
-   subgraph external[Backend Side]
-      control[Control Interface]
-      backend[Virtual USB Device Backend]
-   end
-
-   ports <--> control
-   control <--> backend
-```
+The Linux USB Core remains responsible for standard host-side USB behaviour,
+including enumeration and driver binding.
 
 ```mermaid
 flowchart LR
-   subgraph VirtUSB
-      hc["Host Controller"]
-      ports["Ports"]
-      routing["Transfer Routing"]
+   subgraph linux["Linux Kernel"]
+      usbcore["Linux USB Core"]
+      virtusb["VirtUSB Kernel Module"]
+      topology["Controller and USB Topology"]
+
+      usbcore <--> virtusb
+      virtusb --> topology
    end
 
-   subgraph Backend
-      usb["USB Behaviour"]
-      desc["Descriptors"]
-      eps["Endpoints"]
+   subgraph userspace["Userspace"]
+      interface["Controller Interface"]
+      control["Control Software"]
+      backend["Backend"]
+      hardware["Virtual Device Hardware"]
+
+      control <--> interface
+      backend <--> interface
+      backend -->|"represents"| hardware
    end
 
-   routing <--> usb
+   virtusb <--> interface
+   topology -->|"hosts"| hardware
 ```
 
-## 5.1 VirtUSB Responsibilities
+## 6.1 VirtUSB Responsibilities
 
 VirtUSB is responsible for:
 
 - representing virtual Host Controllers to Linux
-- representing Root Hubs and ports
-- accepting USB requests from the Linux USB core
-- forwarding transfers to the corresponding backend
-- returning backend responses to the Linux USB core
-- managing controller, port, and attachment state
-- reporting USB connection and disconnection events
-- supporting all required USB transfer types
+- representing Root Hubs, hubs, and parent ports
+- managing USB topology
+- managing association, attachment, and detachment
+- reporting host-visible connection and disconnection
+- accepting USB requests from the Linux USB Core
+- routing requests to the corresponding backend
+- returning backend responses to the Linux USB Core
+- supporting Control, Bulk, Interrupt, and Isochronous transfers
 
-## 5.2 Backend Responsibilities
+## 6.2 Backend Responsibilities
 
 A backend is responsible for:
 
+- representing one Virtual Device Hardware instance
 - defining the identity and capabilities of the virtual USB device
 - supplying descriptors
-- handling device requests
+- handling device-specific USB requests
 - implementing endpoint semantics
 - maintaining device-specific protocol and application state
 - generating transfer results and device data
 
-## 5.3 Explicit Boundary
+## 6.3 Explicit Boundary
 
-VirtUSB provides the transport and Host Controller infrastructure required for a
-backend to implement a USB device compliant with the USB 2.0 Device Framework.
+VirtUSB provides the Host Controller, topology, communication, and routing
+infrastructure required for a backend to implement a USB device.
 
-VirtUSB itself does not implement device-specific Chapter 9 behaviour such as
-returning device descriptors or defining device configurations.
+VirtUSB itself does not provide device-specific descriptors, configurations,
+class behaviour, or application logic.
 
 ---
 
-# 6. Typical Operational Flow
+# 7. Typical Operational Flow
+
+Association, attachment, USB connection, and enumeration are distinct steps.
 
 ```mermaid
 stateDiagram-v2
    [*] --> ModuleLoaded
    ModuleLoaded --> ControllerReady
-   ControllerReady --> BackendAttached
-   BackendAttached --> Connected
+   ControllerReady --> BackendCreated
+   BackendCreated --> Associated
+   Associated --> Attached
+   Attached --> Connected
    Connected --> Enumerated
    Enumerated --> Operational
    Operational --> Disconnected
-   Disconnected --> BackendDetached
-   BackendDetached --> [*]
+   Disconnected --> Detached
+   Detached --> Associated
+   Associated --> [*]
 ```
-
-
 
 A typical virtual device session follows this sequence:
 
 1. The VirtUSB kernel module is loaded with the requested number of controller
    instances.
-2. Linux registers each VirtUSB controller and its virtual Root Hub.
-3. Control software opens `/dev/virtusbX`.
-4. A backend is assigned to an available Root Hub port.
-5. VirtUSB reports a device connection on that port.
-6. The Linux USB subsystem begins device enumeration.
-7. Control transfers are forwarded to the backend.
-8. The backend returns descriptors and other device responses.
-9. Linux selects and loads an appropriate USB device driver.
-10. Further Control, Bulk, Interrupt, or Isochronous transfers are exchanged.
-11. The backend is detached or terminated.
-12. VirtUSB reports device disconnection to the Linux USB subsystem.
+2. Linux registers each controller and its virtual Root Hub.
+3. Control Software opens `/dev/virtusbX`.
+4. A backend instance is created.
+5. The backend instance represents one Virtual Device Hardware instance.
+6. The Virtual Device Hardware is associated with one parent port.
+7. The virtual device is attached to the USB topology.
+8. VirtUSB reports a USB connection on that parent port.
+9. The Linux USB subsystem begins enumeration.
+10. Enumeration requests are routed to the backend.
+11. The backend returns descriptors and other device responses.
+12. Linux binds an appropriate USB device driver.
+13. Normal Control, Bulk, Interrupt, or Isochronous transfers are exchanged.
+14. The USB connection is removed.
+15. The virtual device is detached or reassigned.
+16. The backend may remain active, terminate, or be reused according to the
+    backend lifecycle.
 
 ```mermaid
 sequenceDiagram
-   participant Backend as Device Backend
    participant Control as Control Software
+   participant Backend as Backend
    participant VirtUSB as VirtUSB Kernel Module
    participant USB as Linux USB Core
    participant Driver as USB Device Driver
 
    Control->>VirtUSB: Open /dev/virtusbX
-   Control->>VirtUSB: Attach backend to port
-   VirtUSB->>USB: Report device connection
+   Control->>VirtUSB: Register backend
+   Control->>VirtUSB: Associate with parent port
+   Control->>VirtUSB: Attach virtual device
+   VirtUSB->>USB: Report USB connection
    USB->>VirtUSB: Submit enumeration requests
-   VirtUSB->>Backend: Forward control transfers
+   VirtUSB->>Backend: Route Control transfers
    Backend-->>VirtUSB: Return descriptors and responses
-   VirtUSB-->>USB: Complete control transfers
-   USB->>Driver: Bind matching device driver
+   VirtUSB-->>USB: Complete Control transfers
+   USB->>Driver: Bind matching USB driver
    Driver->>VirtUSB: Submit USB transfers
-   VirtUSB->>Backend: Forward transfers
+   VirtUSB->>Backend: Route transfers
    Backend-->>VirtUSB: Return transfer results
    VirtUSB-->>Driver: Complete transfers
-   Control->>VirtUSB: Detach device
-   VirtUSB->>USB: Report device disconnection
+   Control->>VirtUSB: Disconnect and detach device
+   VirtUSB->>USB: Report USB disconnection
 ```
 
 ---
 
-# 7. Transfer Model
+# 8. Transfer Model
 
-VirtUSB shall support the standard USB transfer types:
+VirtUSB supports all standard USB transfer types:
 
 - Control
 - Bulk
 - Interrupt
 - Isochronous
 
-The system must preserve the semantic properties required by the Linux USB
-subsystem and the virtual device backend. Detailed queueing, scheduling,
-cancellation, timeout, and completion behaviour is defined by the architecture
-and interface specifications.
+The Linux USB subsystem schedules transfers.
+
+The VirtUSB kernel module routes transfers.
+
+The backend performs device-specific transfer processing.
+
+Transfer handling is independent of the concrete kernel-userspace transport
+mechanism.
+
+Every submitted transfer eventually reaches exactly one terminal state:
+
+- successful completion
+- completion with an error
+- cancellation
+
+Detailed queueing, timeout, cancellation, ownership, and completion semantics
+are defined by the High-Level Architecture and interface specifications.
 
 ---
 
-# 8. Timing Model
+# 9. Timing Model
 
 VirtUSB does not provide hard real-time guarantees.
 
-In particular, the following timing is not guaranteed with hard real-time
+In particular, the following timing cannot be guaranteed with hard real-time
 precision:
 
-- USB Start-of-Frame generation and frame timing
-- Isochronous transfer scheduling and completion
+- USB Start-of-Frame generation
+- frame and microframe timing
+- Isochronous transfer scheduling
+- Isochronous transfer completion
 
-Virtual USB timing depends on the Linux scheduler, kernel execution latency, and
-the selected backend implementation.
+Virtual USB timing depends on:
+
+- Linux scheduler behaviour
+- kernel execution latency
+- userspace scheduling
+- communication latency
+- backend implementation
 
 VirtUSB may model USB frame and microframe progression, but it cannot guarantee
-exact 1 ms frame periods or 125 us high-speed microframe periods under all system
-conditions.
+exact 1 ms frame periods or 125 µs high-speed microframe periods under all
+system conditions.
+
+Isochronous operation is therefore provided on a best-effort basis.
 
 ---
 
-# 9. Deployment View
+# 10. Deployment View
 
-The initial VirtUSB deployment consists of an out-of-tree Linux kernel module and
-one or more external backend applications or libraries.
+The initial VirtUSB deployment consists of an out-of-tree Linux kernel module
+and one or more userspace applications or libraries.
 
 ```mermaid
 flowchart TB
    subgraph kernel["Linux Kernel"]
-      module["VirtUSB Kernel Module"]
       usb["Linux USB Subsystem"]
+      module["VirtUSB Kernel Module"]
       devnode["/dev/virtusbX"]
 
       usb <--> module
@@ -369,13 +570,14 @@ flowchart TB
    end
 
    subgraph userspace["Userspace"]
-      lib["Optional libvirtusb"]
-      app["Control or Test Application"]
-      backend["Virtual USB Device Backend"]
+      library["Optional libvirtusb"]
+      control["Control or Test Application"]
+      backend["Backend"]
 
-      app <--> lib
-      lib <--> devnode
-      app <--> backend
+      control <--> library
+      library <--> devnode
+      control <--> backend
+      backend <--> devnode
    end
 ```
 
@@ -383,85 +585,103 @@ The kernel module shall be installable and removable through DKMS.
 
 ---
 
-# 10. Interfaces
+# 11. Interfaces
 
 VirtUSB has the following principal interfaces:
 
 | Interface | Purpose |
-| --- | --- |
-| Linux HCD interface | Integrates VirtUSB with the Linux USB subsystem |
-| Root Hub interface | Reports virtual port status and status changes |
-| `/dev/virtusbX` | Controls one virtual Host Controller instance |
-| Backend protocol | Exchanges device state, transfers, and events |
+|---|---|
+| Linux HCD Interface | Integrates VirtUSB with the Linux USB subsystem |
+| Root Hub Interface | Reports Root Hub and port status changes |
+| Controller Interface | Logical interface between one controller instance and userspace |
+| `/dev/virtusbX` | Character-device entry point implementing the Controller Interface |
+| Backend Protocol | Exchanges hardware state, lifecycle events, USB requests, and transfer results |
 | Optional `libvirtusb` API | Provides a stable userspace abstraction |
 
-The concrete userspace protocol and API are outside the scope of this overview.
+The Controller Interface is an architectural concept and shall not be equated
+with one specific transport mechanism.
+
+The concrete userspace protocol, API, message format, and transport mechanisms
+are outside the scope of this overview.
 
 ---
 
-# 11. Project Scope
+# 12. Project Scope
 
 The VirtUSB project includes:
 
 - the VirtUSB Linux kernel module
-- public kernel/userspace interface definitions
+- public kernel-userspace interface definitions
 - tools required to build, install, load, unload, and test the module
 - DKMS integration
-- reference or test backends where useful
+- reference and test backends where useful
 - architecture, interface, development, and testing documentation
-- the future `libvirtusb` userspace library
+- the future optional `libvirtusb` userspace library
 
 ---
 
-# 12. Out of Scope
+# 13. Out of Scope
 
 The following items are outside the responsibility of VirtUSB:
 
 - physical USB Host Controller hardware
 - physical USB device firmware
-- implementation of arbitrary device-class protocols
+- implementation of arbitrary USB device-class protocols
+- device-specific descriptor content
 - device-specific Chapter 9 responses
 - hard real-time USB timing guarantees
+- a mandatory backend framework
+- a preferred programming language or execution model
 - a custom USB protocol analyzer
-- a mandatory or preferred backend framework
 
 ---
 
-# 13. Architectural Constraints
+# 14. Architectural Constraints
 
 The following constraints apply to the system:
 
 - the target operating system is Linux
-- the kernel module remains outside the mainline Linux kernel tree unless this is
-  changed by a future project decision
-- the module must be compatible with DKMS
+- the kernel module remains outside the mainline Linux kernel tree unless changed
+  by a future project decision
+- the module must support DKMS-compatible distribution
 - the project must compile with GCC and LLVM/Clang where applicable
 - the kernel implementation must follow Linux kernel coding and documentation
   conventions
 - the design must support multiple independent controller instances
-- each controller must provide one Root Hub with 31 ports
+- each controller must provide exactly one Root Hub
+- each Root Hub must initially expose exactly 31 downstream ports
 - the backend interface must remain implementation-neutral
+- responsibility layers must remain separated
+- runtime objects must have explicit ownership
+- a backend instance may control only the Virtual Device Hardware it represents
 
 ---
 
-# 14. Open Architectural Questions
+# 15. Relationship to the High-Level Architecture
 
-The following topics require further architectural definition:
+This document intentionally provides a concise system-level overview.
 
-- userspace communication mechanism and protocol
-- ownership and lifetime of controllers, ports, devices, endpoints, and transfers
-- backend registration and attachment model
-- transfer queueing and completion model
-- asynchronous event delivery
-- cancellation and timeout behaviour
-- error reporting and recovery
-- process termination and backend failure handling
-- access control and permissions for `/dev/virtusbX`
-- support for USB speeds and speed negotiation
-- frame and microframe representation
-- memory ownership and copy strategy
-- concurrency and synchronization model
-- compatibility strategy across Linux kernel versions
+The High-Level Architecture defines the normative architectural model in
+detail, including:
 
-These questions shall be resolved in the high-level architecture and in ADRs where
-multiple viable alternatives exist.
+- Architectural Principles
+- Software Components
+- Responsibility Domains
+- Runtime Objects
+- Controller and Topology Model
+- Virtual Device Model
+- Backend Model
+- Transfer Model
+- Communication Model
+- Runtime Model
+- Concurrency Model
+- Failure and Recovery Model
+- Extensibility
+- Architectural Constraints
+- Architectural Evolution
+
+Architecture Decision Records document the rationale for significant
+architectural changes.
+
+This overview shall remain consistent with the High-Level Architecture and the
+project glossary.
