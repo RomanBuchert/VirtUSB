@@ -7,6 +7,10 @@ virtuellen USB-Root-Hub (`VirtUsbRHub`) angeschlossen werden können.
 **VirtUSB virtualisiert USB-Devices, um deren Software unabhängig von der
 Zielhardware entwickeln, testen und debuggen zu können.**
 
+VirtUSB unterstützt ausschließlich USB 2.0.
+
+VirtUSB ist für Linux als Hostbetriebssystem konzipiert.
+
 VirtUSB emuliert keine physische USB-Hardware. Insbesondere werden weder die
 elektrische Signalübertragung noch die Bit- oder Paketebene eines USB-Busses
 emuliert. Die Kommunikation erfolgt auf einer höheren USB-Abstraktionsebene.
