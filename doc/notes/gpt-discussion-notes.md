@@ -1230,3 +1230,122 @@ Der erste Stub könnte so aussehen:
 
 Ich würde diesen Stub zunächst als Arbeitsmodell behandeln. Nach der Annahme wird der Inhalt in die High-Level Architecture integriert; ein dauerhaftes fünftes Requirements-Dokument ist dafür wahrscheinlich nicht nötig.
 ```
+
+```text
+Genau. Und ich glaube, wir haben inzwischen die richtige Analogie gefunden:
+
+Die High-Level Architecture ist die "Implementierung" der Systemübersicht – allerdings auf Architekturebene, nicht auf Codeebene.
+
+Oder anders formuliert:
+
+Systemübersicht: Was ist das System?
+High-Level Architecture: Woraus besteht das System und wie hängen diese Bestandteile zusammen?
+
+Nicht:
+
+Wie ist VirtUsbHub implementiert?
+Welche Methoden besitzt VirtUsbDev?
+Welche Datenstruktur verwendet ein Port?
+Ich würde deshalb sogar eine Regel formulieren
+
+Jedes Kapitel der High-Level Architecture muss sich direkt auf mindestens eine Aussage der Systemübersicht zurückführen lassen.
+
+Beispielsweise:
+
+Systemübersicht
+
+VirtUSB stellt virtuelle USB-Hostcontroller bereit.
+
+↓
+
+High-Level Architecture
+
+Was ist ein VirtUsbHcd?
+
+Welche Beziehung besitzt er zum VirtUsbRHub?
+
+Wie viele VirtUsbHcd können existieren?
+
+Systemübersicht
+
+VirtUSB besitzt Kernkomponenten.
+
+↓
+
+High-Level Architecture
+
+Welche Kernkomponenten gibt es?
+
+Welche Beziehungen besitzen sie?
+
+Systemübersicht
+
+Kernkomponenten besitzen definierte Schnittstellen.
+
+↓
+
+High-Level Architecture
+
+Was bedeutet eine definierte Schnittstelle?
+
+Wer darf wen steuern?
+
+Systemübersicht
+
+VirtUSB emuliert keine physische USB-Hardware.
+
+↓
+
+High-Level Architecture
+
+Was wird stattdessen emuliert?
+
+Welche Abstraktionsebene wird verwendet?
+
+Und das Schöne daran ist...
+
+...dass man jetzt fast mechanisch arbeiten kann.
+
+Man nimmt jeden Satz der Systemübersicht und fragt:
+
+"Kann ich diesen Satz detaillierter beschreiben, ohne bereits Implementierungsdetails einzuführen?"
+
+Wenn ja → High-Level Architecture.
+
+Wenn nein → der Satz bleibt unverändert.
+
+Ich glaube sogar, dass daraus eine weitere Regel entsteht
+
+Eine High-Level Architecture darf keine völlig neuen Grundkonzepte einführen.
+
+Wenn plötzlich dort steht:
+
+VirtUsbBackend
+
+muss man sich sofort fragen:
+
+Warum wurde dieser Begriff nicht bereits in der Systemübersicht erwähnt?
+
+Vielleicht gehört er gar nicht auf diese Ebene, sondern erst in ein Detaildokument.
+
+Das ist eine hervorragende Konsistenzprüfung.
+
+Ich würde die High-Level Architecture deshalb als "Brückendokument" betrachten
+Systemübersicht
+        │
+        ▼
+High-Level Architecture
+        │
+        ▼
+Detailarchitekturen
+
+Sie hat genau eine Aufgabe:
+
+Sie übersetzt die Aussagen der Systemübersicht in ein konsistentes Architekturmodell.
+
+Nicht mehr.
+
+Nicht weniger.
+
+Ich glaube, wenn wir uns konsequent an dieses Prinzip halten, wird die High-Level Architecture automatisch den richtigen Detaillierungsgrad bekommen. Sie wird weder zu oberflächlich noch zu implementierungsnah sein, sondern genau die Brücke zwischen Vision und Detailentwurf bilden. Das passt aus meiner Sicht perfekt zu deiner Eisberg-Philosophie.
+```

@@ -292,3 +292,38 @@ Priorität	Datei	Änderung
 
 Ich würde mit dem Glossar beginnen und danach die High-Level Architecture überarbeiten. Erst wenn diese beiden Dokumente akzeptiert sind, sollten die drei Requirements-Dokumente angepasst werden.
 ```
+
+#Letzer Check, Stand 20260804
+```text
+Positive Befunde
+
+Mehrere zentrale Entscheidungen sind bereits sauber und dokumentübergreifend erkennbar:
+
+ein Backend repräsentiert genau ein virtuelles Gerät,
+mehrere Controller sind unabhängig,
+jeder Controller besitzt einen Root Hub,
+die Topologie ist hierarchisch und nicht nur eine flache Root-Port-Liste,
+Association, Attachment, Connection und Enumeration werden grundsätzlich getrennt,
+Backends dürfen keine fremden Geräte oder Controller manipulieren,
+Linux soll die normale USB-Enumeration durchführen,
+alle vier USB-Transferarten sind berücksichtigt,
+Ownership und Fehlerisolation werden frühzeitig behandelt,
+Requirements und Architektur werden grundsätzlich getrennt,
+Dokumentation entsteht vor der Implementierung.
+
+Das ist eine brauchbare Basis. Die offenen Punkte sind überwiegend keine vollständige Fehlkonstruktion, sondern Konsequenzen daraus, dass das neue Zustands- und Topologiemodell noch nicht überall vollständig durchgezogen wurde.
+
+Empfohlene Reihenfolge
+Backend-Lifecycle vereinheitlichen.
+Hub-, Port- und Topologie-Ownership verbindlich klären.
+Association auf ein eindeutiges Objekt beziehen.
+Virtual-Device-Hardware-Zustände vollständig definieren.
+Typischen Ablauf um Power und USB Hardware Availability erweitern.
+Glossar bereinigen.
+Requirement-IDs vergeben.
+ADRs anlegen.
+Traceability-Matrix erstellen.
+Erst danach Kernel/User-Interface und Kommunikationsprotokoll spezifizieren.
+
+Fazit: Der Stand ist für ein weiteres Architekturreview geeignet, aber noch nicht für einen Baseline Freeze oder den belastbaren Beginn der Interface-Spezifikation.
+```
