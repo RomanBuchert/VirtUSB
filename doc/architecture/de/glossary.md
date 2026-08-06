@@ -10,76 +10,43 @@ ist unabhängig von ihrer konkreten Implementierung.
 
 ## Geräteebene
 
-Die **Geräteebene** beschreibt sämtliche gerätespezifischen Eigenschaften und
-Zustände eines virtuellen USB-Gerätes unabhängig von der USB-Topologie, dem
-USB-Device-Controller und dem USB-Protokoll.
+Die **Geräteebene** beschreibt sämtliche gerätespezifischen Eigenschaften,
+Zustände und Operationen eines virtuellen USB-Gerätes unabhängig von dessen
+Einbindung in eine VirtUSB-Topologie.
 
-Hierzu gehören beispielsweise:
-
-- Existenz eines virtuellen Gerätes
-- Ein- und Ausschalten
-- Reset
-- Firmware- oder Bootzustand
-- gerätespezifischer interner Zustand
-
-Die Geräteebene besitzt kein Wissen über die Position des Gerätes innerhalb der
-USB-Topologie, den Zustand des USB-Device-Controllers oder den aktuellen
-USB-Protokollzustand.
+Sie besitzt kein Wissen über die USB-Topologie, den Zustand des
+USB-Device-Controllers oder den aktuellen USB-Protokollzustand.
 
 ## USB-Topologieebene
 
-Die **USB-Topologieebene** beschreibt die virtuelle USB-Infrastruktur sowie die
-Beziehungen zwischen virtuellen USB-Hostcontrollern, Root-Hubs, USB-Hubs,
-Ports und virtuellen USB-Geräten.
+Die **USB-Topologieebene** beschreibt den strukturellen Aufbau einer
+VirtUSB-Topologie sowie die Parent-Child-Beziehungen zwischen deren
+Kernkomponenten.
 
-Hierzu gehören beispielsweise:
+Sie legt fest, welche Kernkomponenten Bestandteil einer VirtUSB-Topologie sind
+und wie diese miteinander verbunden sind.
 
-- virtuelle USB-Hostcontroller
-- virtuelle Root-Hubs
-- virtuelle USB-Hubs
-- virtuelle USB-Ports
-- Zuordnung eines virtuellen USB-Gerätes zu einem Port
-- virtuelles Anstecken und Abstecken
-- Portstatus und Portänderungen
-
-Die USB-Topologieebene besitzt kein Wissen über den gerätespezifischen Zustand,
-den Zustand des USB-Device-Controllers oder die USB-Protokollkommunikation.
+Sie besitzt kein Wissen über gerätespezifische Zustände, den Zustand des
+USB-Device-Controllers oder die USB-Protokollkommunikation.
 
 ## USB-Device-Controller-Ebene
 
-Die **USB-Device-Controller-Ebene** beschreibt den Zustand und die Steuerung des
-virtuellen USB-Device-Controllers eines virtuellen USB-Gerätes.
+Die **USB-Device-Controller-Ebene** beschreibt den Zustand und die Steuerung
+des virtuellen USB-Device-Controllers eines virtuellen USB-Gerätes.
 
-Hierzu gehören beispielsweise:
+Sie bildet die Schnittstelle zwischen der Geräteebene und der
+USB-Protokollebene.
 
-- Initialisierung des USB-Device-Controllers
-- Deinitialisierung des USB-Device-Controllers
-- USB Connect
-- USB Disconnect
-- Aktivierung und Deaktivierung von Endpoints
-
-Die USB-Device-Controller-Ebene besitzt kein Wissen über den
-gerätespezifischen Zustand oder die USB-Topologie. Sie bildet die Schnittstelle
-zwischen der Geräteebene und der USB-Protokollebene.
+Sie besitzt kein Wissen über den gerätespezifischen Zustand oder die
+USB-Topologie.
 
 ## USB-Protokollebene
 
 Die **USB-Protokollebene** beschreibt sämtliche durch die USB-Spezifikation
-definierten Kommunikationsabläufe zwischen Host und USB-Geräten.
+definierten Kommunikationsabläufe zwischen USB-Host und USB-Geräten.
 
-Hierzu gehören beispielsweise:
-
-- Enumeration
-- Standard Requests
-- Class Requests
-- Vendor Requests
-- Endpoint-Verhalten
-- Control-, Bulk-, Interrupt- und Isochronous-Transfers
-- USB Suspend
-- USB Resume
-
-Die USB-Protokollebene besitzt kein Wissen über den gerätespezifischen Zustand
-oder die USB-Topologie.
+Sie besitzt kein Wissen über den gerätespezifischen Zustand oder die
+USB-Topologie.
 
 # Systemoperationen
 
