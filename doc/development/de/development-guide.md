@@ -134,6 +134,30 @@ Implementierungen sollen bevorzugt einfache und robuste Lösungen verwenden.
 
 ---
 
+## Testing
+
+Tests sind ein wesentlicher Bestandteil der Entwicklung und sollen frühzeitig
+erstellt sowie kontinuierlich erweitert werden.
+
+Für Userspace-Komponenten wird GoogleTest als Unit-Test-Framework verwendet.
+
+CTest dient als projektweiter Einstiegspunkt zur Ausführung von Tests und zur
+Integration in den Buildprozess.
+
+Kernelcode wird nach Möglichkeit mit den hierfür vorgesehenen
+Linux-Kernel-Testwerkzeugen getestet.
+
+Hierzu gehört insbesondere KUnit für Unit-Tests innerhalb des Kernels.
+
+Userspace- und Kernelcode werden mit den jeweils dafür vorgesehenen
+Testframeworks getestet.
+
+Die Auswahl des Testframeworks richtet sich nach der jeweiligen
+Ausführungsumgebung und orientiert sich an den etablierten Werkzeugen der
+jeweiligen Plattform.
+
+---
+
 ## Qualitätssicherung
 
 VirtUSB soll kontinuierlich mit mehreren Compilern überprüft werden.
