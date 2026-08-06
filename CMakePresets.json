@@ -1,0 +1,75 @@
+{
+   "version": 10,
+
+   "cmakeMinimumRequired": {
+      "major": 3,
+      "minor": 31,
+      "patch": 0
+   },
+
+   "$comment": [
+      "Shared VirtUSB CMake presets.",
+      "Machine-specific settings belong in CMakeUserPresets.json."
+   ],
+
+   "configurePresets": [
+      {
+         "name": "base",
+         "hidden": true,
+         "generator": "Ninja",
+         "binaryDir": "${sourceDir}/build/${presetName}",
+         "cacheVariables": {
+            "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+            "BUILD_TESTING": "ON"
+         }
+      },
+      {
+         "name": "dev-gcc",
+         "displayName": "Development: GCC",
+         "description": "Development configuration using GCC.",
+         "inherits": "base",
+         "cacheVariables": {
+            "CMAKE_BUILD_TYPE": "Debug",
+            "CMAKE_C_COMPILER": "gcc"
+         }
+      },
+      {
+         "name": "dev-clang",
+         "displayName": "Development: Clang",
+         "description": "Development configuration using Clang.",
+         "inherits": "base",
+         "cacheVariables": {
+            "CMAKE_BUILD_TYPE": "Debug",
+            "CMAKE_C_COMPILER": "clang"
+         }
+      }
+   ],
+
+   "buildPresets": [
+      {
+         "name": "dev-gcc",
+         "configurePreset": "dev-gcc"
+      },
+      {
+         "name": "dev-clang",
+         "configurePreset": "dev-clang"
+      }
+   ],
+
+   "testPresets": [
+      {
+         "name": "dev-gcc",
+         "configurePreset": "dev-gcc",
+         "output": {
+            "outputOnFailure": true
+         }
+      },
+      {
+         "name": "dev-clang",
+         "configurePreset": "dev-clang",
+         "output": {
+            "outputOnFailure": true
+         }
+      }
+   ]
+}
