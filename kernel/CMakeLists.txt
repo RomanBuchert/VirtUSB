@@ -4,6 +4,12 @@ find_program(
    REQUIRED
 )
 
+find_package(
+   Python3
+   REQUIRED
+   COMPONENTS Interpreter
+)
+
 execute_process(
    COMMAND uname -r
    OUTPUT_VARIABLE VIRTUSB_RUNNING_KERNEL_RELEASE
@@ -25,6 +31,19 @@ if(NOT EXISTS "${VIRTUSB_KERNEL_BUILD_DIR}/Makefile")
       "  ${VIRTUSB_KERNEL_BUILD_DIR}\n"
       "Install the matching kernel headers or set "
       "VIRTUSB_KERNEL_BUILD_DIR explicitly."
+   )
+endif()
+
+set(
+   VIRTUSB_GEN_COMPILE_COMMANDS
+   "${VIRTUSB_KERNEL_BUILD_DIR}/scripts/clang-tools/gen_compile_commands.py"
+)
+
+if(NOT EXISTS "${VIRTUSB_GEN_COMPILE_COMMANDS}")
+   message(
+      FATAL_ERROR
+      "Kernel compile commands generator is unavailable:\n"
+      "  ${VIRTUSB_GEN_COMPILE_COMMANDS}"
    )
 endif()
 
@@ -170,6 +189,9 @@ virtusb-y := ${VIRTUSB_KERNEL_OBJECT_LIST}
 # whenever the target is selected, while Kbuild recompiles only files whose
 # dependencies have changed.
 #
+# After the module has been built, the kernel-provided compile commands
+# generator creates a compilation database from the Kbuild .cmd files.
+#
 
 add_custom_target(
    virtusb_module ALL
@@ -178,6 +200,12 @@ add_custom_target(
       -C "${VIRTUSB_KERNEL_BUILD_DIR}"
       "M=${VIRTUSB_KERNEL_OUTPUT_DIR}"
       modules
+   COMMAND
+      "${Python3_EXECUTABLE}"
+      "${VIRTUSB_GEN_COMPILE_COMMANDS}"
+      -d "${VIRTUSB_KERNEL_OUTPUT_DIR}"
+      -o "${CMAKE_BINARY_DIR}/compile_commands.json"
+      modules.order
    WORKING_DIRECTORY
       "${VIRTUSB_KERNEL_OUTPUT_DIR}"
    DEPENDS
