@@ -88,6 +88,103 @@ They carry small, explicit control operations and do not transport USB
 payload data. The concrete set and binary representation of the
 `ioctl()` operations are defined by a later ABI specification.
 
+### Control-Plane State Access Model
+
+The Control Plane provides two complementary views of hub and port state.
+
+#### Port-Oriented View
+
+The port-oriented view addresses one position within a hub and returns the
+complete state associated with that position.
+
+VirtUSB uses a common position numbering model:
+
+- position 0 represents the hub itself,
+- positions 1 through 31 represent downstream ports 1 through 31.
+
+A port-oriented query for a downstream port therefore answers the question:
+
+> What is the complete state of this port?
+
+The returned state may include, as applicable:
+
+- power,
+- connection,
+- enable,
+- suspend,
+- reset,
+- over-current,
+- USB speed,
+- pending change states.
+
+A query for position 0 addresses the hub itself. It may additionally return a
+snapshot of the states of all downstream ports belonging to that hub. This
+provides an efficient way for diagnostic tools, test programs, TUI
+applications, or GUI applications to obtain the complete current hub state.
+
+The exact binary representation of such a snapshot is defined by the later ABI
+specification.
+
+#### Status-Oriented View
+
+The status-oriented view addresses one state property and returns that property
+for the hub and all of its downstream ports.
+
+It therefore answers questions such as:
+
+> Which ports are currently powered?
+
+or:
+
+> Which ports currently report a connected device?
+
+Boolean states are represented as 32-bit bitmaps using the common VirtUSB
+position numbering model:
+
+``` text
+bit 0       Hub
+bits 1..31  Downstream ports 1..31
+```
+
+This representation applies naturally to boolean properties such as power,
+connection, enable, suspend, reset, and over-current state.
+
+Multi-bit properties such as USB speed use an equivalently position-oriented
+packed representation with enough bits per position to represent all valid
+property values.
+
+Status-oriented queries return the complete state representation. The kernel
+does not apply a caller-provided port mask. A user-space consumer that is
+interested only in selected ports applies the required mask to the returned
+value itself.
+
+This keeps the kernel ABI simple and deterministic and avoids unnecessary
+filtering semantics for values that are already compact.
+
+#### State Modification
+
+The Control Plane may modify only states that represent externally controllable
+or simulated virtual-hardware conditions.
+
+This includes, in particular:
+
+- port power,
+- device connection and disconnection,
+- over-current conditions,
+- connection speed.
+
+States that result from USB protocol operation or host-controller behavior are
+not directly controlled through this interface merely because they are
+observable through the status-oriented or port-oriented views.
+
+This distinction preserves the separation between the Control Plane and the
+USB Data Plane. For example, enable, suspend, and reset states may be observable
+through the Control Plane while their transitions remain governed by USB
+protocol and HCD operation.
+
+The concrete set of readable and writable properties, `ioctl()` commands, and
+binary ABI structures is defined by the later ABI specification.
+
 ### USB Data Plane
 
 The USB Data Plane uses shared memory. The shared-memory region is

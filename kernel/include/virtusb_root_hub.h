@@ -10,7 +10,8 @@
  * This header defines the functional model of a VirtUSB root hub.
  *
  * A VirtUsbRHub is permanently associated with exactly one VirtUsbHcd and uses
- * the common VirtUSB hub model for its hub and downstream-port state.
+ * the common VirtUSB hub model for its virtual hardware state, USB-visible
+ * state, and USB change information.
  *
  * Root-hub-specific state may be added to this structure as required by later
  * implementation steps.
@@ -32,7 +33,8 @@ struct virtusb_root_hub {
  * @root_hub: Root hub to initialize.
  * @port_count: Number of downstream ports.
  *
- * Initializes the common hub state of @root_hub.
+ * Initializes the common hub model of @root_hub, including virtual hardware
+ * state, USB-visible state, and pending USB change information.
  *
  * Return: 0 on success or a negative error code if the parameters are invalid.
  */
@@ -43,7 +45,10 @@ int virtusb_root_hub_init(struct virtusb_root_hub *root_hub,
  * virtusb_root_hub_reset() - Reset the functional root-hub state
  * @root_hub: Root hub to reset.
  *
- * Resets the common hub state while preserving the configured number of
- * downstream ports.
+ * Resets the complete common hub model while preserving the configured number
+ * of downstream ports.
+ *
+ * This is a VirtUSB functional-model reset and must not be confused with USB
+ * reset signaling or a USB hub-class reset operation.
  */
 void virtusb_root_hub_reset(struct virtusb_root_hub *root_hub);

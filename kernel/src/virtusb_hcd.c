@@ -40,18 +40,18 @@ static u32 virtusb_hcd_port_change_mask(const struct virtusb_hub *hub)
 {
    u32 changes;
 
-   changes = hub->change.connected |
-             hub->change.enabled |
-             hub->change.suspended |
-             hub->change.reset |
-             hub->change.over_current;
+   changes = hub->usb_change.connected |
+             hub->usb_change.enabled |
+             hub->usb_change.suspended |
+             hub->usb_change.reset |
+             hub->usb_change.over_current;
 
    /*
     * Bit 0 represents hub-level change state. Currently only over-current
     * has meaningful hub-level semantics.
     */
    changes &= ~BIT(0);
-   changes |= hub->change.over_current & BIT(0);
+   changes |= hub->usb_change.over_current & BIT(0);
 
    return changes;
 }
@@ -62,27 +62,27 @@ static u16 virtusb_hcd_build_port_status(const struct virtusb_hub *hub,
    enum virtusb_port_speed speed;
    u16 status = 0U;
 
-   if (virtusb_hcd_port_state_test(hub->state.connected, port_number)) {
+   if (virtusb_hcd_port_state_test(hub->usb.connected, port_number)) {
       status |= USB_PORT_STAT_CONNECTION;
    }
 
-   if (virtusb_hcd_port_state_test(hub->state.enabled, port_number)) {
+   if (virtusb_hcd_port_state_test(hub->usb.enabled, port_number)) {
       status |= USB_PORT_STAT_ENABLE;
    }
 
-   if (virtusb_hcd_port_state_test(hub->state.suspended, port_number)) {
+   if (virtusb_hcd_port_state_test(hub->usb.suspended, port_number)) {
       status |= USB_PORT_STAT_SUSPEND;
    }
 
-   if (virtusb_hcd_port_state_test(hub->state.over_current, port_number)) {
+   if (virtusb_hcd_port_state_test(hub->usb.over_current, port_number)) {
       status |= USB_PORT_STAT_OVERCURRENT;
    }
 
-   if (virtusb_hcd_port_state_test(hub->state.reset, port_number)) {
+   if (virtusb_hcd_port_state_test(hub->usb.reset, port_number)) {
       status |= USB_PORT_STAT_RESET;
    }
 
-   if (virtusb_hcd_port_state_test(hub->state.powered, port_number)) {
+   if (virtusb_hcd_port_state_test(hub->usb.powered, port_number)) {
       status |= USB_PORT_STAT_POWER;
    }
 
@@ -110,23 +110,23 @@ static u16 virtusb_hcd_build_port_change(const struct virtusb_hub *hub,
 {
    u16 change = 0U;
 
-   if (virtusb_hcd_port_state_test(hub->change.connected, port_number)) {
+   if (virtusb_hcd_port_state_test(hub->usb_change.connected, port_number)) {
       change |= USB_PORT_STAT_C_CONNECTION;
    }
 
-   if (virtusb_hcd_port_state_test(hub->change.enabled, port_number)) {
+   if (virtusb_hcd_port_state_test(hub->usb_change.enabled, port_number)) {
       change |= USB_PORT_STAT_C_ENABLE;
    }
 
-   if (virtusb_hcd_port_state_test(hub->change.suspended, port_number)) {
+   if (virtusb_hcd_port_state_test(hub->usb_change.suspended, port_number)) {
       change |= USB_PORT_STAT_C_SUSPEND;
    }
 
-   if (virtusb_hcd_port_state_test(hub->change.over_current, port_number)) {
+   if (virtusb_hcd_port_state_test(hub->usb_change.over_current, port_number)) {
       change |= USB_PORT_STAT_C_OVERCURRENT;
    }
 
-   if (virtusb_hcd_port_state_test(hub->change.reset, port_number)) {
+   if (virtusb_hcd_port_state_test(hub->usb_change.reset, port_number)) {
       change |= USB_PORT_STAT_C_RESET;
    }
 
@@ -249,11 +249,15 @@ static int virtusb_hcd_get_hub_status(const struct virtusb_hub *hub, char *buf)
    u16 status = 0U;
    u16 change = 0U;
 
-   if (virtusb_hcd_port_state_test(hub->state.over_current, 0U)) {
+   /*
+    * Hub-level USB status is intentionally distinct from downstream-port
+    * status. VirtUSB currently models only hub-level over-current state.
+    */
+   if (virtusb_hcd_port_state_test(hub->usb.over_current, 0U)) {
       status |= HUB_STATUS_OVERCURRENT;
    }
 
-   if (virtusb_hcd_port_state_test(hub->change.over_current, 0U)) {
+   if (virtusb_hcd_port_state_test(hub->usb_change.over_current, 0U)) {
       change |= HUB_CHANGE_OVERCURRENT;
    }
 
@@ -293,35 +297,45 @@ static int virtusb_hcd_clear_port_feature(struct virtusb_hub *hub,
 
    switch (feature) {
    case USB_PORT_FEAT_ENABLE:
-      virtusb_hcd_port_state_clear(&hub->state.enabled, port_number);
+      virtusb_hcd_port_state_clear(&hub->usb.enabled, port_number);
       break;
 
    case USB_PORT_FEAT_SUSPEND:
-      virtusb_hcd_port_state_clear(&hub->state.suspended, port_number);
+      /*
+       * Clearing PORT_SUSPEND starts host-initiated resume processing.
+       *
+       * VirtUSB does not model resume timing yet. Until that state machine
+       * exists, clear the USB-visible suspend state directly.
+       */
+      virtusb_hcd_port_state_clear(&hub->usb.suspended, port_number);
       break;
 
    case USB_PORT_FEAT_POWER:
-      virtusb_hcd_port_state_clear(&hub->state.powered, port_number);
+      /*
+       * PORT_POWER represents the USB-visible logical power-control state.
+       * It must not modify the independently simulated hardware power state.
+       */
+      virtusb_hcd_port_state_clear(&hub->usb.powered, port_number);
       break;
 
    case USB_PORT_FEAT_C_CONNECTION:
-      virtusb_hcd_port_state_clear(&hub->change.connected, port_number);
+      virtusb_hcd_port_state_clear(&hub->usb_change.connected, port_number);
       break;
 
    case USB_PORT_FEAT_C_ENABLE:
-      virtusb_hcd_port_state_clear(&hub->change.enabled, port_number);
+      virtusb_hcd_port_state_clear(&hub->usb_change.enabled, port_number);
       break;
 
    case USB_PORT_FEAT_C_SUSPEND:
-      virtusb_hcd_port_state_clear(&hub->change.suspended, port_number);
+      virtusb_hcd_port_state_clear(&hub->usb_change.suspended, port_number);
       break;
 
    case USB_PORT_FEAT_C_OVER_CURRENT:
-      virtusb_hcd_port_state_clear(&hub->change.over_current, port_number);
+      virtusb_hcd_port_state_clear(&hub->usb_change.over_current, port_number);
       break;
 
    case USB_PORT_FEAT_C_RESET:
-      virtusb_hcd_port_state_clear(&hub->change.reset, port_number);
+      virtusb_hcd_port_state_clear(&hub->usb_change.reset, port_number);
       break;
 
    default:
@@ -340,16 +354,20 @@ static int virtusb_hcd_set_port_feature(struct virtusb_hub *hub,
    }
 
    switch (feature) {
-   case USB_PORT_FEAT_ENABLE:
-      virtusb_hcd_port_state_set(&hub->state.enabled, port_number);
-      break;
-
    case USB_PORT_FEAT_SUSPEND:
-      virtusb_hcd_port_state_set(&hub->state.suspended, port_number);
+      /*
+       * PORT_SUSPEND is a USB-controlled state. It does not modify the
+       * independently simulated hardware state.
+       */
+      virtusb_hcd_port_state_set(&hub->usb.suspended, port_number);
       break;
 
    case USB_PORT_FEAT_POWER:
-      virtusb_hcd_port_state_set(&hub->state.powered, port_number);
+      /*
+       * PORT_POWER represents the USB-visible logical power-control state.
+       * Actual simulated power availability remains in hub->hw.powered.
+       */
+      virtusb_hcd_port_state_set(&hub->usb.powered, port_number);
       break;
 
    case USB_PORT_FEAT_RESET:
@@ -357,11 +375,12 @@ static int virtusb_hcd_set_port_feature(struct virtusb_hub *hub,
        * A reset of an unconnected port has no effect.
        *
        * Reset timing and completion will be implemented together with the
-       * downstream-device connection model.
+       * downstream-device connection model. Completion must eventually clear
+       * PORT_RESET, set PORT_ENABLE, and set C_PORT_RESET.
        */
-      if (virtusb_hcd_port_state_test(hub->state.connected, port_number)) {
-         virtusb_hcd_port_state_clear(&hub->state.enabled, port_number);
-         virtusb_hcd_port_state_set(&hub->state.reset, port_number);
+      if (virtusb_hcd_port_state_test(hub->usb.connected, port_number)) {
+         virtusb_hcd_port_state_clear(&hub->usb.enabled, port_number);
+         virtusb_hcd_port_state_set(&hub->usb.reset, port_number);
       }
       break;
 
@@ -393,10 +412,13 @@ static int virtusb_hcd_hub_control(struct usb_hcd *hcd,
    case ClearHubFeature:
       switch (value) {
       case C_HUB_LOCAL_POWER:
+         /*
+          * Local-power change state is not modeled yet.
+          */
          return 0;
 
       case C_HUB_OVER_CURRENT:
-         virtusb_hcd_port_state_clear(&hub->change.over_current, 0U);
+         virtusb_hcd_port_state_clear(&hub->usb_change.over_current, 0U);
          return 0;
 
       default:
@@ -441,7 +463,6 @@ static const struct hc_driver virtusb_hc_driver = {
    .hub_status_data = virtusb_hcd_hub_status_data,
    .hub_control = virtusb_hcd_hub_control,
 };
-
 
 static int virtusb_hcd_platform_probe(struct platform_device *pdev)
 {

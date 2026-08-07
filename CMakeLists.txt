@@ -34,4 +34,5 @@ if(CMAKE_EXPORT_COMPILE_COMMANDS)
    endif()
 endif()
 
+add_subdirectory(uapi)
 add_subdirectory(kernel)
