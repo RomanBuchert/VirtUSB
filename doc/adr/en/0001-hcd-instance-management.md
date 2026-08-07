@@ -1,6 +1,6 @@
 # ADR-0001: HCD Instance Management
 
--   **Status:** Proposed
+-   **Status:** Accepted
 -   **Date:** 2026-08-06
 
 ------------------------------------------------------------------------

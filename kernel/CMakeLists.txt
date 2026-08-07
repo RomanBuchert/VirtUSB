@@ -58,20 +58,31 @@ set(
 )
 
 #
-# Source of truth for all source files belonging to the kernel module.
+# Source of truth for all source and header files belonging to the kernel
+# module.
 #
 
 set(
    VIRTUSB_KERNEL_SOURCE_FILES
    src/virtusb_module.c
+   src/virtusb_hcd.c
+   src/virtusb_hub.c
+   src/virtusb_root_hub.c
+)
+
+set(
+   VIRTUSB_KERNEL_HEADER_FILES
+   include/virtusb_hcd.h
+   include/virtusb_hub.h
+   include/virtusb_root_hub.h
 )
 
 #
 # Create the generated Kbuild source view.
 #
-# Original sources remain below kernel/. Kbuild operates exclusively in the
-# current CMake binary directory so that all generated files and build
-# artifacts stay below build/.
+# Original sources and headers remain below kernel/. Kbuild operates
+# exclusively in the current CMake binary directory so that all generated
+# files and build artifacts stay below build/.
 #
 
 set(VIRTUSB_KBUILD_SOURCE_FILES)
@@ -152,6 +163,64 @@ foreach(VIRTUSB_KERNEL_SOURCE_FILE IN LISTS VIRTUSB_KERNEL_SOURCE_FILES)
 endforeach()
 
 #
+# Add internal kernel headers to the generated Kbuild source view.
+#
+
+set(VIRTUSB_KBUILD_HEADER_FILES)
+
+foreach(VIRTUSB_KERNEL_HEADER_FILE IN LISTS VIRTUSB_KERNEL_HEADER_FILES)
+   set(
+      VIRTUSB_KERNEL_HEADER_PATH
+      "${VIRTUSB_KERNEL_SOURCE_DIR}/${VIRTUSB_KERNEL_HEADER_FILE}"
+   )
+
+   set(
+      VIRTUSB_KERNEL_LINK_PATH
+      "${VIRTUSB_KERNEL_OUTPUT_DIR}/${VIRTUSB_KERNEL_HEADER_FILE}"
+   )
+
+   if(NOT EXISTS "${VIRTUSB_KERNEL_HEADER_PATH}")
+      message(
+         FATAL_ERROR
+         "Kernel header file does not exist:\n"
+         "  ${VIRTUSB_KERNEL_HEADER_PATH}"
+      )
+   endif()
+
+   get_filename_component(
+      VIRTUSB_KERNEL_LINK_DIR
+      "${VIRTUSB_KERNEL_LINK_PATH}"
+      DIRECTORY
+   )
+
+   file(MAKE_DIRECTORY "${VIRTUSB_KERNEL_LINK_DIR}")
+   file(REMOVE "${VIRTUSB_KERNEL_LINK_PATH}")
+
+   file(
+      CREATE_LINK
+      "${VIRTUSB_KERNEL_HEADER_PATH}"
+      "${VIRTUSB_KERNEL_LINK_PATH}"
+      SYMBOLIC
+      RESULT VIRTUSB_KERNEL_LINK_RESULT
+   )
+
+   if(NOT VIRTUSB_KERNEL_LINK_RESULT STREQUAL "0")
+      message(
+         FATAL_ERROR
+         "Failed to create kernel header link:\n"
+         "  ${VIRTUSB_KERNEL_LINK_PATH}\n"
+         "Reason: ${VIRTUSB_KERNEL_LINK_RESULT}"
+      )
+   endif()
+
+   list(
+      APPEND
+      VIRTUSB_KBUILD_HEADER_FILES
+      "${VIRTUSB_KERNEL_LINK_PATH}"
+   )
+endforeach()
+
+#
 # Generate Kbuild from the CMake source list.
 #
 
@@ -174,6 +243,8 @@ file(
 "obj-m := virtusb.o
 
 virtusb-y := ${VIRTUSB_KERNEL_OBJECT_LIST}
+
+ccflags-y += -I\$(src)/include
 "
    NEWLINE_STYLE UNIX
 )
@@ -211,6 +282,7 @@ add_custom_target(
    DEPENDS
       "${VIRTUSB_KBUILD_FILE}"
       ${VIRTUSB_KBUILD_SOURCE_FILES}
+      ${VIRTUSB_KBUILD_HEADER_FILES}
    COMMENT
       "Building the VirtUSB kernel module"
    USES_TERMINAL
