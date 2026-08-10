@@ -83,28 +83,40 @@ In particular, downstream ports are integral parts of their respective
 hub object and are identified through the hub and their port number.
 
 
-Although downstream ports are not Core Components and are not managed by
-`VirtUsbObjMgr`, they are represented internally by a dedicated
+Although USB ports are not Core Components and are not managed by
+`VirtUsbObjMgr`, they are represented internally by the dedicated
 `VirtUsbPort` runtime type.
 
-A `VirtUsbPort` is a hub-owned subobject. Its lifetime is completely bound to
-the lifetime of its parent `VirtUsbRHub` or `VirtUsbHub`. It therefore has no
-global object ID, no independent `kref`, and no independent registration in the
-object manager.
+`VirtUsbPort` is a component-owned subobject. Its lifetime is completely bound
+to its owning Core Component. It therefore has no global object ID, no
+independent `kref`, and no independent registration in the object manager.
 
-`VirtUsbPort` is the canonical internal representation of one downstream port.
-It contains the port-local topology relationship and the canonical port state,
-including the associated child object and the USB-visible and simulated
-hardware state required by the port model.
+The same `VirtUsbPort` type is used for upstream and downstream ports. A port
+role identifies which USB semantics apply. `VirtUsbDev` owns one upstream
+port, `VirtUsbHub` owns one upstream port plus its downstream ports, and
+`VirtUsbRHub` owns downstream ports only.
 
-Packed bitmaps and other aggregate representations are not maintained as a
-second copy of the port state. They are generated from `VirtUsbPort` instances
+A port stores only its own local capabilities, properties, and state.
+Properties whose semantics are common to both roles belong to the common port
+representation; role-specific properties belong to the corresponding upstream
+or downstream representation.
+
+Association is a reciprocal peer relationship between one downstream port and
+one upstream port. No independent device-to-HCD Association is stored.
+
+Effective connection properties are derived from the local state of both peer
+ports according to USB rules. They are not maintained as a separate persistent
+link-state copy. For example, each port stores its own supported speed; the
+effective connection speed is derived from the capabilities of both ports.
+
+Packed bitmaps and other aggregate representations are also not maintained as
+a second copy of port state. They are generated from `VirtUsbPort` instances
 only when required for UAPI transfer, USB hub-class translation, or another
 explicit serialization boundary. Incoming aggregate representations are
-decoded directly into the corresponding `VirtUsbPort` state.
+decoded directly into the corresponding port state.
 
-This avoids maintaining two independent representations of the same state and
-therefore prevents bitmap/port-state divergence.
+This single-source-of-truth model prevents divergence between local port
+state, effective connection state, and serialized bitmap representations.
 
 ### Common Kernel Object Representation
 
@@ -353,8 +365,7 @@ Relationships such as:
 
 ```text
 VirtUsbHcd <-> VirtUsbRHub
-Downstream Port <-> VirtUsbDev
-Downstream Port <-> VirtUsbHub
+Downstream VirtUsbPort <-> Upstream VirtUsbPort
 ```
 
 are represented and maintained by the corresponding functional
@@ -606,6 +617,10 @@ diverging numeric representations.
   `libvirtusb`.
 - Future Core Component types can use the same generic object
   infrastructure.
+- Upstream and downstream ports share the same `VirtUsbPort` base model.
+- Each port stores only its own local capabilities, properties, and state.
+- Effective connection properties are derived from both peer ports according
+  to USB rules rather than stored redundantly.
 - Port state has one canonical internal representation in `VirtUsbPort`.
 - Bitmap and packed representations cannot silently diverge from persistent
   per-port state because they are generated only at explicit boundaries.

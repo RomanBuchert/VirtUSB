@@ -77,60 +77,103 @@ A VirtUSB topology forms a parent-child tree whose root consists of a
 Each `VirtUsbHcd` owns exactly one `VirtUsbRHub`. Each `VirtUsbRHub`
 belongs to exactly one `VirtUsbHcd`.
 
-### Relationship Hub ↔ Downstream Ports
+### Relationship Components ↔ Ports
 
-Both `VirtUsbRHub` and `VirtUsbHub` provide downstream ports. Downstream
-ports are integral parts of their respective hubs and have no
-independent existence.
+USB-capable VirtUSB components own their ports as integral subobjects.
 
-
-Each downstream port is represented internally by a dedicated `VirtUsbPort`
-subobject.
+- `VirtUsbDev` owns exactly one upstream `VirtUsbPort`.
+- `VirtUsbHub` owns exactly one upstream `VirtUsbPort` and one or more
+  downstream `VirtUsbPort` instances.
+- `VirtUsbRHub` owns downstream `VirtUsbPort` instances only. It has no USB
+  upstream port because its upstream side terminates at the host controller.
 
 `VirtUsbPort` is not a VirtUSB Core Component. It has no independent lifetime
-or global object identity and exists exactly as long as its parent hub exists.
+or global object identity. A port exists exactly as long as its owning Core
+Component exists.
 
-The `VirtUsbPort` instance is the canonical internal representation of the
-port. It contains the port-local topology relationship and the port state
-required by the hub model.
+Each port has a role identifying it as an upstream or downstream port.
+Role-independent properties and state are represented in the common port
+representation. Properties or state that exist only for one role are kept in
+role-specific upstream or downstream state.
 
-Hub-wide bitmaps and other packed representations are not persistent parallel
-state. They are created only when an aggregate representation is required, for
-example for UAPI transfer or translation to USB hub-class data structures.
+### Canonical Port State
 
-### Relationship Downstream Port ↔ `VirtUsbDev`
+A `VirtUsbPort` describes only its own local capabilities, properties, and
+state. These values are authoritative for that port and are independent of the
+values stored by another port.
 
-A downstream port can be associated with at most one `VirtUsbDev` or
-`VirtUsbHub`. A `VirtUsbDev` or `VirtUsbHub` can be associated with at
-most one downstream port at any time.
+For example, an upstream and a downstream port each describe their own power
+state and supported USB speed. The values do not have to be identical. This is
+required, among other cases, to model self-powered devices correctly.
 
-Association establishes the parent-child relationship between the hub
-port and the device. It defines the local structure of the VirtUSB
-topology but does not imply that the device is attached or USB-visible.
+Properties of the effective USB connection are not stored as a second,
+persistent state representation. They are derived from the local properties
+and state of both associated ports according to the applicable USB rules.
+
+For example, if a high-speed-capable downstream port is associated with a
+full-speed-only upstream port, the effective connection cannot operate faster
+than full speed.
+
+The architectural rule is therefore:
+
+> A `VirtUsbPort` stores facts about itself. Effective link and USB-visible
+> properties are derived from both ports and the USB rules.
+
+Hub-wide bitmaps and other packed representations are likewise not persistent
+parallel state. They are generated from the individual `VirtUsbPort` instances
+only when required for UAPI transfer, USB hub-class translation, or another
+explicit serialization boundary. Incoming aggregate representations are
+decoded into the affected port state instead of being stored independently.
+
+### Relationship Port ↔ Port
+
+Association is represented locally between one downstream `VirtUsbPort` and
+one upstream `VirtUsbPort`.
+
+Each associated port references the other port as its peer. The peer
+relationship is reciprocal and must remain consistent:
+
+```text
+downstream.peer -> upstream
+upstream.peer   -> downstream
+```
+
+An upstream port can be associated with at most one downstream port, and a
+downstream port can be associated with at most one upstream port.
+
+Upstream-to-upstream and downstream-to-downstream Associations are invalid.
+
+Association defines the local parent-child structure of the virtual USB
+topology but does not by itself imply USB-visible connection or enumeration.
+
+No separate persistent link object or duplicate link-state representation is
+required. Effective properties of the relationship are derived from the two
+ports.
 
 ### Relationship `VirtUsbHub` ↔ Topology
 
 `VirtUsbHub` is functionally a specialized `VirtUsbDev`.
 
-A `VirtUsbHub` can be associated with at most one downstream port. In
-contrast, a `VirtUsbRHub` has no parent port.
+Its upstream port can be associated with at most one downstream port of a
+parent `VirtUsbRHub` or `VirtUsbHub`. Its own downstream-port Associations are
+independent of that parent Association.
 
-Disassociating a `VirtUsbHub` from its parent port does not modify the
-associations within the subtree beneath it. The subtree remains
-internally intact and can later become part of another VirtUSB topology
-by associating its root hub object with a downstream port of that
-topology.
+Disassociating a `VirtUsbHub` upstream port from its parent downstream port does
+not modify the Associations within the subtree beneath it. The subtree remains
+internally intact and can later become part of another VirtUSB topology by
+associating the hub's upstream port with a downstream port in that topology.
 
 ### Relationship `VirtUsbDev` ↔ Topology
 
 A `VirtUsbDev` exists independently of any VirtUSB topology.
 
-Only after Association establishes a parent-child relationship with a
-hub port and that relationship forms a continuous path to exactly one
-`VirtUsbHcd` does the device become part of that HCD's topology.
+Its upstream port may be unassociated. Only when that upstream port is
+associated with a downstream port and the resulting Association tree forms a
+continuous path to exactly one `VirtUsbRHub` does the device become part of an
+HCD topology.
 
-HCD membership is therefore derived from the Association tree. It is
-not stored as an independent device-to-HCD relationship.
+HCD membership is therefore derived by traversing the port Association tree.
+It is not stored as an independent device-to-HCD relationship.
 
 Detaching a device does not affect its Association or its existence.
 
@@ -264,30 +307,20 @@ USB-defined device states.
 
 ### Canonical Port Representation
 
-VirtUSB maintains one authoritative internal representation for each downstream
-port: `VirtUsbPort`.
+`VirtUsbPort` is the single authoritative internal representation of a USB
+port. It is used for both upstream and downstream ports.
 
-Conceptually, a port contains:
+The common part contains properties and state whose semantics are identical
+for both roles. Role-specific state is represented separately for upstream and
+downstream ports.
 
-- its parent hub,
-- its one-based port number,
-- the associated child object, if any,
-- simulated port-hardware state required by the model,
-- USB-visible port state,
-- USB port-change state,
-- and port properties such as the detected USB speed where applicable.
+Each port stores only its own local state. Values that describe an effective
+connection are calculated from both associated ports according to USB rules
+and are not redundantly persisted.
 
-The exact kernel structure is an implementation detail, but the architectural
-rule is that the individual port object is the source of truth.
-
-Persistent hub-wide status or change bitmaps must not duplicate this state.
-Such bitmaps are generated on demand by iterating over the hub's `VirtUsbPort`
-instances and are used only as aggregate or transfer representations.
-
-Likewise, an incoming aggregate representation is decoded into the affected
-port objects rather than stored independently.
-
-This rule prevents inconsistent parallel state representations.
+Persistent hub-wide status or change bitmaps must not duplicate port state.
+Such representations are generated only when required at an interface
+boundary.
 
 ### USB Hub-Port State
 

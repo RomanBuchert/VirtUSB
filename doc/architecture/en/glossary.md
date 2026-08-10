@@ -60,21 +60,22 @@ those terms.
 
 ## Association
 
-Association is a VirtUSB-specific management relationship.
+An **Association** is the local logical relationship between one downstream
+`VirtUsbPort` and one upstream `VirtUsbPort`.
 
-Association is the local logical assignment of a `VirtUsbDev` or `VirtUsbHub`
-to exactly one downstream port of a `VirtUsbRHub` or `VirtUsbHub`. It establishes
-the parent-child relationship and therefore defines the object's position in a
-VirtUSB topology. A downstream port can be associated with at most one such
-object.
+The relationship is represented by reciprocal peer references. It defines the
+parent-child structure of a VirtUSB topology but does not by itself imply that
+the ports are attached, USB-visible, or enumerated.
 
-Association alone does not mean that the associated object is attached or
-USB-visible and has no USB-defined meaning.
+Only upstream-to-downstream Associations are valid. Each port can participate
+in at most one Association.
 
-Membership in a `VirtUsbHcd` topology is derived by traversing the Association
-tree towards the `VirtUsbRHub`; it is not represented by an independent
-device-to-HCD Association. A locally associated subtree whose root has no path
-to a `VirtUsbRHub` therefore belongs to no HCD topology.
+The HCD to which a device or hub subtree belongs is derived by traversing the
+Association tree toward the `VirtUsbRHub`; it is not stored as a separate
+device-to-HCD Association.
+
+Disassociating the upstream port of a `VirtUsbHub` does not alter Associations
+inside the subtree below that hub.
 
 ## Disassociation
 
@@ -234,17 +235,32 @@ Their implementation may differ from the underlying hardware.
 
 ## VirtUsbPort
 
-A **VirtUsbPort** is the internal representation of one downstream port of a
-`VirtUsbRHub` or `VirtUsbHub`.
+A **VirtUsbPort** is the internal representation of one virtual USB port.
 
-It is not a VirtUSB Core Component and has no independent lifetime or global
-object identity. A `VirtUsbPort` exists exactly as long as its parent hub.
+The same port type is used for upstream and downstream ports. Its role
+identifies which USB semantics apply.
 
-The port is the canonical internal location for its topology relationship and
-port-local state. Aggregate bitmaps or packed port-state representations are
-derived from the individual ports only when required for transfer or protocol
-translation; they are not maintained as a second authoritative copy of the
-state.
+A `VirtUsbPort` is not a VirtUSB Core Component and has no independent
+lifetime or global object identity. It is an integral subobject of its owning
+Core Component.
+
+A `VirtUsbDev` owns one upstream port. A `VirtUsbHub` owns one upstream port
+and one or more downstream ports. A `VirtUsbRHub` owns downstream ports only.
+
+Each port stores its own local capabilities, properties, and state. Common
+properties are represented independently of the port role; role-specific
+properties belong to the upstream or downstream representation.
+
+The state of one port is not implicitly copied to its peer. Effective
+connection properties are derived from both associated ports according to USB
+rules.
+
+Association is represented by reciprocal peer references between exactly one
+upstream and one downstream `VirtUsbPort`.
+
+Aggregate bitmaps or packed port-state representations are derived from the
+individual ports only when required for transfer or protocol translation; they
+are not maintained as a second authoritative copy of the state.
 
 ## VirtUsbHcd
 
