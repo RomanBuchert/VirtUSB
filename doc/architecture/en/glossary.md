@@ -232,6 +232,20 @@ They form the foundation of the virtual USB topology and perform the
 same fundamental roles within VirtUSB as their physical counterparts.
 Their implementation may differ from the underlying hardware.
 
+## VirtUsbPort
+
+A **VirtUsbPort** is the internal representation of one downstream port of a
+`VirtUsbRHub` or `VirtUsbHub`.
+
+It is not a VirtUSB Core Component and has no independent lifetime or global
+object identity. A `VirtUsbPort` exists exactly as long as its parent hub.
+
+The port is the canonical internal location for its topology relationship and
+port-local state. Aggregate bitmaps or packed port-state representations are
+derived from the individual ports only when required for transfer or protocol
+translation; they are not maintained as a second authoritative copy of the
+state.
+
 ## VirtUsbHcd
 
 A **VirtUsbHcd** (Virtual USB Host Controller) is the virtual

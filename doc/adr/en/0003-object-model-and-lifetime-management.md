@@ -82,6 +82,30 @@ Entities that do not have independent existence are not VirtUSB objects.
 In particular, downstream ports are integral parts of their respective
 hub object and are identified through the hub and their port number.
 
+
+Although downstream ports are not Core Components and are not managed by
+`VirtUsbObjMgr`, they are represented internally by a dedicated
+`VirtUsbPort` runtime type.
+
+A `VirtUsbPort` is a hub-owned subobject. Its lifetime is completely bound to
+the lifetime of its parent `VirtUsbRHub` or `VirtUsbHub`. It therefore has no
+global object ID, no independent `kref`, and no independent registration in the
+object manager.
+
+`VirtUsbPort` is the canonical internal representation of one downstream port.
+It contains the port-local topology relationship and the canonical port state,
+including the associated child object and the USB-visible and simulated
+hardware state required by the port model.
+
+Packed bitmaps and other aggregate representations are not maintained as a
+second copy of the port state. They are generated from `VirtUsbPort` instances
+only when required for UAPI transfer, USB hub-class translation, or another
+explicit serialization boundary. Incoming aggregate representations are
+decoded directly into the corresponding `VirtUsbPort` state.
+
+This avoids maintaining two independent representations of the same state and
+therefore prevents bitmap/port-state divergence.
+
 ### Common Kernel Object Representation
 
 The kernel uses a common internal base representation for all VirtUSB
@@ -511,6 +535,23 @@ The selected model instead centralizes type-independent object
 allocation while retaining type-specific initialization in each
 component.
 
+### Parallel Per-Port and Hub-Bitmap State
+
+Port state is stored both in individual `VirtUsbPort` instances and in
+persistent hub-wide bitmaps.
+
+#### Assessment
+
+Rejected.
+
+Maintaining both representations as authoritative state would require every
+state transition to update two independent data structures atomically. Any
+missed or partial update could leave the port object and the bitmap
+representation inconsistent.
+
+The selected model keeps `VirtUsbPort` as the single source of truth and uses
+bitmaps only as transient aggregate or transfer representations.
+
 ### Object Manager Without Reference Counting
 
 Registered objects are stored in a registry and are destroyed
@@ -565,6 +606,9 @@ diverging numeric representations.
   `libvirtusb`.
 - Future Core Component types can use the same generic object
   infrastructure.
+- Port state has one canonical internal representation in `VirtUsbPort`.
+- Bitmap and packed representations cannot silently diverge from persistent
+  per-port state because they are generated only at explicit boundaries.
 
 ### Disadvantages
 
@@ -578,6 +622,8 @@ diverging numeric representations.
 - The distinction between allocation, concrete initialization,
   registration, unregistration, and final release requires disciplined
   lifecycle handling.
+- Aggregate bitmap generation and decoding require explicit conversion code
+  at interface boundaries.
 
 ---
 

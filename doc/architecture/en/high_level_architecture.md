@@ -83,6 +83,21 @@ Both `VirtUsbRHub` and `VirtUsbHub` provide downstream ports. Downstream
 ports are integral parts of their respective hubs and have no
 independent existence.
 
+
+Each downstream port is represented internally by a dedicated `VirtUsbPort`
+subobject.
+
+`VirtUsbPort` is not a VirtUSB Core Component. It has no independent lifetime
+or global object identity and exists exactly as long as its parent hub exists.
+
+The `VirtUsbPort` instance is the canonical internal representation of the
+port. It contains the port-local topology relationship and the port state
+required by the hub model.
+
+Hub-wide bitmaps and other packed representations are not persistent parallel
+state. They are created only when an aggregate representation is required, for
+example for UAPI transfer or translation to USB hub-class data structures.
+
 ### Relationship Downstream Port ↔ `VirtUsbDev`
 
 A downstream port can be associated with at most one `VirtUsbDev` or
@@ -246,6 +261,33 @@ and required USB hardware are operational.
 
 These conditions may influence USB-visible behavior but do not replace the
 USB-defined device states.
+
+### Canonical Port Representation
+
+VirtUSB maintains one authoritative internal representation for each downstream
+port: `VirtUsbPort`.
+
+Conceptually, a port contains:
+
+- its parent hub,
+- its one-based port number,
+- the associated child object, if any,
+- simulated port-hardware state required by the model,
+- USB-visible port state,
+- USB port-change state,
+- and port properties such as the detected USB speed where applicable.
+
+The exact kernel structure is an implementation detail, but the architectural
+rule is that the individual port object is the source of truth.
+
+Persistent hub-wide status or change bitmaps must not duplicate this state.
+Such bitmaps are generated on demand by iterating over the hub's `VirtUsbPort`
+instances and are used only as aggregate or transfer representations.
+
+Likewise, an incoming aggregate representation is decoded into the affected
+port objects rather than stored independently.
+
+This rule prevents inconsistent parallel state representations.
 
 ### USB Hub-Port State
 
