@@ -171,7 +171,103 @@ These include:
 The meaning of each system operation is defined in the Glossary.
 
 System operations may propagate recursively along existing parent-child
-relationships but do not modify the topology structure.
+relationships. Attach and Detach are the operations that establish or remove
+the corresponding parent-child relationship; other state changes do not modify
+the topology structure.
+
+## State Model
+
+VirtUSB distinguishes state according to the architectural domain in which the
+state exists. Similar terms in different domains are not aliases and must not
+be combined merely because one state may cause another.
+
+### Device Hardware State
+
+Device hardware state describes the operational state of the virtual device
+itself. It includes whether the device is powered on and whether its virtual USB
+Device Controller is operational.
+
+This state exists independently of the device's integration into a VirtUSB
+topology. A virtual device may exist and be powered on without being attached
+to a port.
+
+### Topology State
+
+Topology state describes relationships between VirtUSB components. In
+particular, it records whether a `VirtUsbDev` is associated with and attached to
+a downstream port.
+
+Attach and Detach modify this relationship. Attachment alone does not imply a
+host-visible USB connection.
+
+### Port Hardware State
+
+Port hardware state represents externally controllable or simulated conditions
+of the virtual port hardware. Examples include power availability and
+over-current conditions. Connection speed may also originate from the virtual
+hardware or attached device model.
+
+Port hardware state is distinct from the USB hub-class status reported to the
+host.
+
+### USB-Visible Port State
+
+USB-visible port state is the state exposed through USB hub semantics. It
+includes connection, enable, suspend, reset, logical port power, over-current,
+and the speed information applicable to the connected device.
+
+Some USB-visible states are consequences of topology and virtual-hardware
+conditions. Others are controlled by normal USB host and hub operation. They
+are therefore not generally writable Control Plane properties.
+
+In particular, host-visible connection is derived from the conditions required
+for the port to detect an attached device. A typical relationship is:
+
+```text
+Device attached to port
+        +
+Device-side USB hardware operational
+        +
+Port hardware permits operation
+        +
+USB logical Port Power active
+        |
+        v
+Host-visible USB connection
+```
+
+If one of the required conditions is removed, the host-visible connection must
+no longer be reported even if the device remains attached to the topology.
+
+### USB Change State
+
+USB change state records host-visible changes that have not yet been
+acknowledged according to USB hub semantics. Examples include connection,
+enable, suspend, reset, and over-current changes.
+
+Change state is derived from transitions of the corresponding USB-visible state
+and is not an independent virtual-hardware control surface.
+
+### USB Device Protocol State
+
+The USB device protocol state machine, including the USB-defined states
+Attached, Powered, Default, Address, Configured, and Suspended, is separate from
+the VirtUSB topology and port state described above.
+
+In particular, the USB-defined state named Attached must not be confused with
+the VirtUSB Attach operation. VirtUSB uses Attach to describe the topology
+relationship between a virtual device and a downstream port.
+
+### State Propagation
+
+State transitions may propagate between domains, but the originating and
+derived states remain distinct. For example, attaching a device does not
+directly set the USB connection state. Instead, the topology change contributes
+to the conditions from which the host-visible connection state is derived.
+
+This separation is also the basis for the Control Plane: user space controls
+external virtual-hardware and topology conditions, while USB protocol and
+host-controller state remain governed by their respective USB operations.
 
 ## Interface and Communication Model
 

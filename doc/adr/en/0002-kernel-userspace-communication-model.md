@@ -168,19 +168,25 @@ or simulated virtual-hardware conditions.
 
 This includes, in particular:
 
-- port power,
-- device connection and disconnection,
-- over-current conditions,
-- connection speed.
+- topology operations such as attach and detach,
+- virtual device power and operational state,
+- virtual port hardware conditions such as power availability and over-current,
+- connection-speed information supplied by the virtual hardware or device
+  model.
+
+Host-visible USB connection and logical USB Port Power are not treated as
+generic writable Control Plane properties merely because they are observable.
+USB connection is derived from the relevant topology, virtual-hardware, and USB
+port conditions. Logical Port Power is part of normal USB hub operation.
 
 States that result from USB protocol operation or host-controller behavior are
 not directly controlled through this interface merely because they are
 observable through the status-oriented or port-oriented views.
 
 This distinction preserves the separation between the Control Plane and the
-USB Data Plane. For example, enable, suspend, and reset states may be observable
-through the Control Plane while their transitions remain governed by USB
-protocol and HCD operation.
+USB Data Plane. For example, connection, enable, suspend, reset, and logical
+port-power states may be observable through the Control Plane while their
+transitions remain governed by the state model, USB protocol, and HCD operation.
 
 The concrete set of readable and writable properties, `ioctl()` commands, and
 binary ABI structures is defined by the later ABI specification.

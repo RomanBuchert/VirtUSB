@@ -83,23 +83,69 @@ topology.
 
 ## USB Connect
 
-USB Connect signals the presence of a virtual USB device to the virtual
-USB Host Controller.
+USB Connect is the transition by which an attached virtual USB device becomes
+visible to the USB host as connected on its parent port.
 
-The virtual USB Device Controller must already be initialized.
+USB Connect is distinct from Attach. Attach establishes the VirtUSB topology
+relationship; USB Connect establishes the host-visible USB connection.
 
-USB Connect requires the device to be attached to a virtual USB port.
+A USB connection can become visible only when the device is attached, the
+device-side USB hardware is operational, and the parent port is in a state in
+which a connection can be detected. In particular, a powered-off port does not
+report a connected device.
 
-USB Connect does not initiate enumeration by itself, but makes it
-possible.
+USB Connect is therefore normally a consequence of the relevant topology,
+virtual-hardware, and USB port states rather than an independent USB protocol
+state that user space sets directly.
+
+USB Connect does not initiate enumeration by itself. It causes the host to see
+the connection change, after which the host may begin enumeration.
 
 ## USB Disconnect
 
-USB Disconnect terminates the USB connection to the virtual USB Host
-Controller as signaled by the virtual USB Device Controller.
+USB Disconnect is the transition by which a previously host-visible USB
+connection ceases to be reported on the parent port.
 
-The virtual USB device remains part of the virtual USB topology and may
-remain attached to a virtual USB port.
+USB Disconnect does not by itself remove the device from the VirtUSB topology.
+The virtual USB device may remain attached to the same port and may become
+connected again when the required conditions are restored.
+
+Detaching a connected device necessarily removes the host-visible USB
+connection as a consequence of removing the topology relationship.
+
+## Port Power
+
+Port Power is the USB-visible logical power-control state of a downstream port.
+
+It is distinct from the operational or power state of the virtual device and
+from any virtual-hardware condition describing whether power is physically or
+logically available to the port. The USB-visible Port Power state is controlled
+through normal USB hub operation.
+
+A port in the powered-off state cannot report a connected device.
+
+## Device Power and Port Power
+
+Device Power and Port Power belong to different state domains.
+
+Power On and Power Off describe whether the virtual device hardware is
+operational at the Device Layer. Port Power describes the host-visible logical
+power-control state of the downstream USB port. Neither state is an alias for
+the other.
+
+A device may therefore be attached to the VirtUSB topology while either the
+device or its parent port is not in a state that permits a host-visible USB
+connection.
+
+## VirtUSB Attach and USB Device State "Attached"
+
+VirtUSB Attach is a topology operation defined by VirtUSB. It must not be
+confused with the USB device state named Attached by the USB specification.
+
+The VirtUSB operation establishes the parent-child relationship between a
+virtual device and a downstream port. The USB device state machine describes
+the protocol-visible lifecycle of a USB device. The two concepts may be related
+during normal operation but are not interchangeable.
 
 ## Enumeration
 
