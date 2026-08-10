@@ -1,0 +1,2 @@
+# VirtUSB Control Plane
+SUBSYSTEM=="virtusb", KERNEL=="virtusb[0-9]*", GROUP="virtusb", MODE="0660"

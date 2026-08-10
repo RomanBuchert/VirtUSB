@@ -222,6 +222,11 @@ struct virtusb_speed_map {
  * DOC: VirtUSB ioctl interface
  *
  * The ioctl type value identifies VirtUSB Control-Plane commands.
+ *
+ * USB-visible hub-port state retains USB semantics. In particular,
+ * PORT_CONNECTION and PORT_POWER are not exposed as arbitrary writable
+ * Control-Plane properties. Writable commands operate only on VirtUSB-specific
+ * management state or simulated hardware conditions.
  */
 #define VIRTUSB_IOCTL_MAGIC 0xB9U
 
@@ -248,12 +253,6 @@ struct virtusb_speed_map {
 
 #define VIRTUSB_IOCTL_GET_SPEED \
    _IOWR(VIRTUSB_IOCTL_MAGIC, 0x07, struct virtusb_speed_map)
-
-#define VIRTUSB_IOCTL_SET_POWER \
-   _IOW(VIRTUSB_IOCTL_MAGIC, 0x10, struct virtusb_status_bitmap)
-
-#define VIRTUSB_IOCTL_SET_CONNECTED \
-   _IOW(VIRTUSB_IOCTL_MAGIC, 0x11, struct virtusb_status_bitmap)
 
 #define VIRTUSB_IOCTL_SET_OVER_CURRENT \
    _IOW(VIRTUSB_IOCTL_MAGIC, 0x12, struct virtusb_status_bitmap)

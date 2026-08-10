@@ -329,13 +329,22 @@ Relationships such as:
 
 ```text
 VirtUsbHcd <-> VirtUsbRHub
-VirtUsbDev <-> VirtUsbHcd
-VirtUsbDev <-> Hub / Port
-VirtUsbHub <-> Parent Hub / Port
+Downstream Port <-> VirtUsbDev
+Downstream Port <-> VirtUsbHub
 ```
 
 are represented and maintained by the corresponding functional
 components.
+
+Association is a local parent-child relationship between a downstream
+port and a `VirtUsbDev` or `VirtUsbHub`. Membership in a particular
+`VirtUsbHcd` topology is derived by traversing these relationships to the
+`VirtUsbRHub`; it is not represented by an independent device-to-HCD
+relationship.
+
+Consequently, moving the root of an associated hub subtree to another
+VirtUSB topology does not require updating the Associations within that
+subtree. Only the Association of the subtree root changes.
 
 In particular, the following concepts remain distinct:
 

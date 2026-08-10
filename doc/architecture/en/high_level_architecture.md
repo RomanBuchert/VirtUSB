@@ -85,32 +85,39 @@ independent existence.
 
 ### Relationship Downstream Port ↔ `VirtUsbDev`
 
-A downstream port can have at most one `VirtUsbDev` attached. A
-`VirtUsbDev` can be attached to at most one downstream port at any time.
+A downstream port can be associated with at most one `VirtUsbDev` or
+`VirtUsbHub`. A `VirtUsbDev` or `VirtUsbHub` can be associated with at
+most one downstream port at any time.
 
-Attaching a device establishes a parent-child relationship between the
-hub and the device.
+Association establishes the parent-child relationship between the hub
+port and the device. It defines the local structure of the VirtUSB
+topology but does not imply that the device is attached or USB-visible.
 
 ### Relationship `VirtUsbHub` ↔ Topology
 
 `VirtUsbHub` is functionally a specialized `VirtUsbDev`.
 
-A `VirtUsbHub` can be attached to at most one downstream port. In
+A `VirtUsbHub` can be associated with at most one downstream port. In
 contrast, a `VirtUsbRHub` has no parent port.
 
-Detaching a `VirtUsbHub` does not modify the parent-child structure of
-the subtree beneath it. The subtree remains internally intact and can
-later become part of a VirtUSB topology again.
+Disassociating a `VirtUsbHub` from its parent port does not modify the
+associations within the subtree beneath it. The subtree remains
+internally intact and can later become part of another VirtUSB topology
+by associating its root hub object with a downstream port of that
+topology.
 
 ### Relationship `VirtUsbDev` ↔ Topology
 
 A `VirtUsbDev` exists independently of any VirtUSB topology.
 
-Only after establishing a parent-child relationship with a hub port and
-having a continuous path to exactly one `VirtUsbHcd` does it become part
-of a VirtUSB topology.
+Only after Association establishes a parent-child relationship with a
+hub port and that relationship forms a continuous path to exactly one
+`VirtUsbHcd` does the device become part of that HCD's topology.
 
-Detaching a device does not affect its existence.
+HCD membership is therefore derived from the Association tree. It is
+not stored as an independent device-to-HCD relationship.
+
+Detaching a device does not affect its Association or its existence.
 
 ### Cascading
 
@@ -154,120 +161,224 @@ components. They are not software layers or implementation layers.
 Each core component has states and properties on all four architecture
 layers.
 
-## System Operations
+## State and Operation Model
 
-System operations modify the state of a VirtUSB topology.
+VirtUSB aligns its externally visible USB state with the terminology and
+semantics defined by the USB specification.
 
-These include:
+VirtUSB-specific state is introduced only where the project requires a
+management or virtual-hardware concept for which USB defines no equivalent
+state.
 
--   Power On
--   Power Off
--   Attach
--   Detach
--   USB Connect
--   USB Disconnect
--   Enumeration
+This distinction prevents internal control state from being confused with
+USB-visible device or hub-port state.
 
-The meaning of each system operation is defined in the Glossary.
+### VirtUSB-Specific Management State
 
-System operations may propagate recursively along existing parent-child
-relationships. Attach and Detach are the operations that establish or remove
-the corresponding parent-child relationship; other state changes do not modify
-the topology structure.
+The following relationships are specific to VirtUSB:
 
-## State Model
+- Association and Disassociation
+- backend ownership and lifecycle
+- USB Hardware Availability
+- optional simulated hardware fault or availability conditions
 
-VirtUSB distinguishes state according to the architectural domain in which the
-state exists. Similar terms in different domains are not aliases and must not
-be combined merely because one state may cause another.
+Association assigns a `VirtUsbDev` or `VirtUsbHub` to one specific downstream
+port of a `VirtUsbRHub` or `VirtUsbHub`. It establishes the local parent-child
+relationship and therefore defines the structure of the VirtUSB topology.
+Association does not by itself mean that the device is attached or USB-visible.
+
+The HCD to which an associated object belongs is derived by traversing its
+parent relationships towards the `VirtUsbRHub`. There is no independent
+device-to-HCD Association. Consequently, moving an associated hub subtree to a
+different topology requires changing only the Association of the subtree root;
+the Associations within that subtree remain unchanged.
+
+Association and Attachment are therefore distinct:
+
+```text
+Virtual device exists
+        |
+        v
+Associated with one downstream port
+(topology position defined)
+        |
+        v
+Attached at that associated port
+```
+
+A device may remain associated while detached and may later be attached again
+at its associated port without recreating the device or backend.
+
+### USB Device State
+
+Once a device is attached, VirtUSB follows the USB-defined visible device-state
+model as closely as practical.
+
+The relevant USB-defined states are:
+
+- Attached
+- Powered
+- Default
+- Address
+- Configured
+- Suspended
+
+These states retain their USB specification meaning.
+
+An attached device may exist without being powered. After power is available,
+the device is in the Powered state but must not respond to normal bus
+transactions until it has received reset signaling. Completion of reset places
+the device in Default. Address assignment and configuration then move it
+through Address and Configured according to normal USB enumeration.
+
+VirtUSB-specific Association is not part of this USB device-state machine.
 
 ### Device Hardware State
 
-Device hardware state describes the operational state of the virtual device
-itself. It includes whether the device is powered on and whether its virtual USB
-Device Controller is operational.
+Device hardware state describes conditions of the simulated device that are not
+themselves USB protocol states.
 
-This state exists independently of the device's integration into a VirtUSB
-topology. A virtual device may exist and be powered on without being attached
-to a port.
+Examples include Device Power and USB Hardware Availability.
 
-### Topology State
+Device Power represents whether the virtual device hardware is powered. USB
+Hardware Availability represents whether the virtual device-side USB controller
+and required USB hardware are operational.
 
-Topology state describes relationships between VirtUSB components. In
-particular, it records whether a `VirtUsbDev` is associated with and attached to
-a downstream port.
+These conditions may influence USB-visible behavior but do not replace the
+USB-defined device states.
 
-Attach and Detach modify this relationship. Attachment alone does not imply a
-host-visible USB connection.
+### USB Hub-Port State
 
-### Port Hardware State
+Downstream ports follow the USB-defined hub-port state model wherever practical.
 
-Port hardware state represents externally controllable or simulated conditions
-of the virtual port hardware. Examples include power availability and
-over-current conditions. Connection speed may also originate from the virtual
-hardware or attached device model.
+Relevant states include:
 
-Port hardware state is distinct from the USB hub-class status reported to the
-host.
+- Powered-off
+- Disconnected
+- Disabled
+- Resetting
+- Enabled
+- Suspended
+- Resuming
 
-### USB-Visible Port State
+The USB-visible status of a downstream port is represented by the corresponding
+USB-defined status fields, including:
 
-USB-visible port state is the state exposed through USB hub semantics. It
-includes connection, enable, suspend, reset, logical port power, over-current,
-and the speed information applicable to the connected device.
+- `PORT_CONNECTION`
+- `PORT_ENABLE`
+- `PORT_SUSPEND`
+- `PORT_OVER_CURRENT`
+- `PORT_RESET`
+- `PORT_POWER`
 
-Some USB-visible states are consequences of topology and virtual-hardware
-conditions. Others are controlled by normal USB host and hub operation. They
-are therefore not generally writable Control Plane properties.
+`PORT_POWER` is the USB-defined logical port-power state. It is not an alias for
+Device Power and does not automatically imply a separately modeled physical
+power-supply condition.
 
-In particular, host-visible connection is derived from the conditions required
-for the port to detect an attached device. A typical relationship is:
+### Attachment and USB Connection
+
+Attachment and USB Connection are related but are not interchangeable control
+variables.
+
+Attach establishes that a virtual device is present at a concrete downstream
+port.
+
+USB Connection is the host-visible `PORT_CONNECTION` status of that port.
+
+For a port whose USB-defined Port Power state permits detection,
+`PORT_CONNECTION` reflects whether the attached device is detected. A port in
+the USB-defined `Powered-off` or `Disconnected` state reports no connection.
+
+The relationship is therefore conceptually:
 
 ```text
-Device attached to port
-        +
-Device-side USB hardware operational
-        +
-Port hardware permits operation
-        +
-USB logical Port Power active
+Device associated with controller
         |
         v
-Host-visible USB connection
+Device attached to port
+        +
+Device power / USB hardware conditions permit operation
+        +
+USB hub port is not Powered-off
+        |
+        v
+Attachment is detectable
+        |
+        v
+PORT_CONNECTION = 1
+        |
+        v
+C_PORT_CONNECTION on transition
+        |
+        v
+Host enumeration
 ```
 
-If one of the required conditions is removed, the host-visible connection must
-no longer be reported even if the device remains attached to the topology.
+`PORT_CONNECTION` is therefore derived state and must not be modeled as an
+arbitrary user-space writable switch.
+
+Likewise, clearing `PORT_CONNECTION` is a consequence of a USB-defined port
+state or of removing a prerequisite such as attachment; it is not an
+independent Detach operation.
 
 ### USB Change State
 
-USB change state records host-visible changes that have not yet been
-acknowledged according to USB hub semantics. Examples include connection,
-enable, suspend, reset, and over-current changes.
+USB change state records USB-defined port changes that have not yet been
+acknowledged by the host.
 
-Change state is derived from transitions of the corresponding USB-visible state
-and is not an independent virtual-hardware control surface.
+Examples include connection, enable, suspend, over-current, and reset changes.
 
-### USB Device Protocol State
+These change bits are derived from the corresponding USB-visible transitions.
+They are not independent virtual-hardware state.
 
-The USB device protocol state machine, including the USB-defined states
-Attached, Powered, Default, Address, Configured, and Suspended, is separate from
-the VirtUSB topology and port state described above.
+### Enumeration
 
-In particular, the USB-defined state named Attached must not be confused with
-the VirtUSB Attach operation. VirtUSB uses Attach to describe the topology
-relationship between a virtual device and a downstream port.
+Enumeration remains a USB host operation.
 
-### State Propagation
+When a device attachment is detected on a powered port, the hub reports the
+change to the host. The host identifies the changed port, waits for the required
+connection stabilization interval, resets and enables the port, and then
+progresses the device through the USB-defined Default, Address, and Configured
+states.
 
-State transitions may propagate between domains, but the originating and
-derived states remain distinct. For example, attaching a device does not
-directly set the USB connection state. Instead, the topology change contributes
-to the conditions from which the host-visible connection state is derived.
+VirtUSB provides the virtual controller, hub, topology, and backend interaction
+required to support this process. The Linux USB subsystem remains responsible
+for normal host-side enumeration behavior.
 
-This separation is also the basis for the Control Plane: user space controls
-external virtual-hardware and topology conditions, while USB protocol and
-host-controller state remain governed by their respective USB operations.
+### Operation Categories
+
+VirtUSB distinguishes three categories of state transition.
+
+**VirtUSB management operations** manipulate project-specific relationships or
+virtual hardware, for example:
+
+- Associate
+- Disassociate
+- Attach
+- Detach
+- Device Power changes
+- USB Hardware Availability changes
+- simulated hardware fault conditions
+
+**Derived USB-visible transitions** result from the state model rather than from
+direct Control Plane commands, for example:
+
+- `PORT_CONNECTION` becoming set or clear
+- corresponding USB port-change indications
+
+**USB protocol and hub operations** remain governed by USB semantics and the
+host stack, for example:
+
+- Port Power control
+- Port Reset
+- Port Enable/Disable
+- Suspend/Resume
+- Enumeration
+- Address assignment
+- Configuration
+
+State transitions may propagate between these domains, but their meanings
+remain separate.
 
 ## Interface and Communication Model
 

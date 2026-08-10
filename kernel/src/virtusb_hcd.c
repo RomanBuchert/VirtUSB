@@ -364,8 +364,9 @@ static int virtusb_hcd_set_port_feature(struct virtusb_hub *hub,
 
    case USB_PORT_FEAT_POWER:
       /*
-       * PORT_POWER represents the USB-visible logical power-control state.
-       * Actual simulated power availability remains in hub->hw.powered.
+       * PORT_POWER represents the USB-defined logical port-power state. It is
+       * distinct from Device Power and from optional simulated power-supply
+       * conditions that may be introduced by the virtual hardware model.
        */
       virtusb_hcd_port_state_set(&hub->usb.powered, port_number);
       break;

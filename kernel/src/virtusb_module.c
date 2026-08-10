@@ -6,6 +6,7 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 
+#include "virtusb_control.h"
 #include "virtusb_hcd.h"
 
 #define VIRTUSB_DEFAULT_HCD_COUNT 1U
@@ -50,10 +51,16 @@ static int __init virtusb_module_init(void)
       return -ENOMEM;
    }
 
+   ret = virtusb_control_register(hcd_count);
+   if (ret < 0) {
+      pr_err("VirtUSB: failed to register Control Plane: %d\n", ret);
+      goto free_hcd_devices;
+   }
+
    ret = virtusb_hcd_driver_register();
    if (ret < 0) {
       pr_err("VirtUSB: failed to register HCD platform driver: %d\n", ret);
-      goto free_hcd_devices;
+      goto unregister_control;
    }
 
    for (instance = 0U; instance < hcd_count; ++instance) {
@@ -82,6 +89,9 @@ destroy_hcds:
    virtusb_module_destroy_hcds();
    virtusb_hcd_driver_unregister();
 
+unregister_control:
+   virtusb_control_unregister();
+
 free_hcd_devices:
    kfree(virtusb_hcd_devices);
    virtusb_hcd_devices = NULL;
@@ -94,6 +104,7 @@ static void __exit virtusb_module_exit(void)
    virtusb_module_destroy_hcds();
 
    virtusb_hcd_driver_unregister();
+   virtusb_control_unregister();
 
    kfree(virtusb_hcd_devices);
    virtusb_hcd_devices = NULL;

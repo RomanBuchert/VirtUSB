@@ -35,4 +35,6 @@ if(CMAKE_EXPORT_COMPILE_COMMANDS)
 endif()
 
 add_subdirectory(uapi)
+add_subdirectory(libvirtusb)
+add_subdirectory(tools)
 add_subdirectory(kernel)

@@ -4,6 +4,7 @@
 
 #include <linux/types.h>
 
+#include "virtusb_control.h"
 #include "virtusb_root_hub.h"
 
 struct platform_device;
@@ -18,8 +19,11 @@ struct platform_device;
  * forms the root of one independent VirtUSB topology.
  *
  * Every VirtUsbHcd owns exactly one VirtUsbRHub. The root hub is represented
- * by struct virtusb_root_hub and uses the common VirtUSB hub model for its hub
- * and downstream-port state.
+ * by struct virtusb_root_hub and uses the common VirtUSB hub model for its
+ * virtual hardware state, USB-visible state, and USB change information.
+ *
+ * Every VirtUsbHcd also owns exactly one user-space Control-Plane instance
+ * exposed as /dev/virtusbX, where X is the zero-based HCD instance number.
  *
  * The VirtUSB-specific HCD state is stored in the private data area allocated
  * by the Linux USB HCD core.
@@ -34,6 +38,7 @@ struct platform_device;
  * struct virtusb_hcd - VirtUSB-specific host-controller state
  * @instance: Zero-based VirtUSB HCD instance number.
  * @root_hub: Root hub belonging to this host controller.
+ * @control: User-space Control Plane belonging to this host controller.
  *
  * @instance remains constant for the complete lifetime of the HCD.
  *
@@ -43,6 +48,7 @@ struct platform_device;
 struct virtusb_hcd {
    unsigned int instance;
    struct virtusb_root_hub root_hub;
+   struct virtusb_control control;
 };
 
 /**
@@ -69,11 +75,12 @@ void virtusb_hcd_driver_unregister(void);
  *
  * Creates and registers a Linux platform device. The registered VirtUSB
  * platform driver probes the device, creates the corresponding Linux USB HCD,
- * initializes the VirtUSB-specific HCD state, and registers the controller with
- * the Linux USB core.
+ * initializes the VirtUSB-specific HCD state, registers the controller with
+ * the Linux USB core, and creates the corresponding /dev/virtusbX Control-Plane
+ * device.
  *
- * virtusb_hcd_driver_register() must have completed successfully before this
- * function is called.
+ * virtusb_hcd_driver_register() and virtusb_control_register() must have
+ * completed successfully before this function is called.
  *
  * Return: Pointer to the Linux platform device on success or an ERR_PTR()
  * encoded error value on failure.
@@ -86,7 +93,8 @@ struct platform_device *virtusb_hcd_create(unsigned int instance,
  * @pdev: Linux platform device returned by virtusb_hcd_create().
  *
  * Unregisters the platform device. The platform driver's remove callback
- * unregisters and releases the associated Linux USB HCD.
+ * removes the corresponding /dev/virtusbX device and unregisters and releases
+ * the associated Linux USB HCD.
  *
  * Passing NULL has no effect.
  */
