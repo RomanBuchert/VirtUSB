@@ -119,6 +119,22 @@ The architectural rule is therefore:
 > A `VirtUsbPort` stores facts about itself. Effective link and USB-visible
 > properties are derived from both ports and the USB rules.
 
+
+The common local port state currently includes at least:
+
+- `powered`: the local power state from the owner's point of view. For a
+  downstream port this means that the hub provides VBUS at that port. For an
+  upstream port it describes whether the owner operates/powers its USB
+  upstream side. The values of peer ports are independent.
+- `suspended`: the local suspend state from the owner's point of view. A
+  downstream port represents the host/hub-side suspend state; an upstream port
+  represents the suspend state recognized or assumed by the device-side USB
+  interface. The values may differ transiently.
+
+USB-conformant behavior is enforced by the rules governing state transitions
+and by derived connection state; common fields are not implicitly mirrored
+between peer ports.
+
 Hub-wide bitmaps and other packed representations are likewise not persistent
 parallel state. They are generated from the individual `VirtUsbPort` instances
 only when required for UAPI transfer, USB hub-class translation, or another
@@ -127,55 +143,67 @@ decoded into the affected port state instead of being stored independently.
 
 ### Relationship Port ↔ Port
 
-Association is represented locally between one downstream `VirtUsbPort` and
-one upstream `VirtUsbPort`.
+A virtual USB Attachment is represented locally between exactly one downstream
+`VirtUsbPort` and one upstream `VirtUsbPort`.
 
-Each associated port references the other port as its peer. The peer
-relationship is reciprocal and must remain consistent:
+Each attached port references the other port as its peer. The relationship is
+reciprocal and must remain consistent:
 
 ```text
 downstream.peer -> upstream
 upstream.peer   -> downstream
 ```
 
-An upstream port can be associated with at most one downstream port, and a
-downstream port can be associated with at most one upstream port.
+There is no separate persistent runtime state for Association and Attachment.
+Assigning the two ports to each other is the virtual act of plugging them
+together.
 
-Upstream-to-upstream and downstream-to-downstream Associations are invalid.
+Therefore:
 
-Association defines the local parent-child structure of the virtual USB
-topology but does not by itself imply USB-visible connection or enumeration.
+```text
+peer == NULL     -> detached
+peer != NULL     -> attached
+```
 
-No separate persistent link object or duplicate link-state representation is
-required. Effective properties of the relationship are derived from the two
-ports.
+An upstream port can be attached to at most one downstream port, and a
+downstream port can be attached to at most one upstream port.
+Upstream-to-upstream and downstream-to-downstream Attachments are invalid.
+
+The term **Association** may be used descriptively for the structural
+relationship established by Attachment, but VirtUSB does not support an
+independent `associated && !attached` runtime state.
+
+Attachment defines the local parent-child structure of the virtual USB
+topology. It does not by itself imply USB-visible Connection or enumeration.
+USB-visible Connection is a separate, derived condition based on the local
+state of the involved ports and the applicable USB rules.
 
 ### Relationship `VirtUsbHub` ↔ Topology
 
 `VirtUsbHub` is functionally a specialized `VirtUsbDev`.
 
-Its upstream port can be associated with at most one downstream port of a
-parent `VirtUsbRHub` or `VirtUsbHub`. Its own downstream-port Associations are
-independent of that parent Association.
+Its upstream port can be attached to at most one downstream port of a
+parent `VirtUsbRHub` or `VirtUsbHub`. Its own downstream-port Attachments are
+independent of that parent Attachment.
 
-Disassociating a `VirtUsbHub` upstream port from its parent downstream port does
-not modify the Associations within the subtree beneath it. The subtree remains
+Detaching a `VirtUsbHub` upstream port from its parent downstream port does
+not modify the Attachments within the subtree beneath it. The subtree remains
 internally intact and can later become part of another VirtUSB topology by
-associating the hub's upstream port with a downstream port in that topology.
+attaching the hub's upstream port to a downstream port in that topology.
 
 ### Relationship `VirtUsbDev` ↔ Topology
 
 A `VirtUsbDev` exists independently of any VirtUSB topology.
 
-Its upstream port may be unassociated. Only when that upstream port is
-associated with a downstream port and the resulting Association tree forms a
+Its upstream port may be detached. Only when that upstream port is
+attached to a downstream port and the resulting Attachment tree forms a
 continuous path to exactly one `VirtUsbRHub` does the device become part of an
 HCD topology.
 
-HCD membership is therefore derived by traversing the port Association tree.
+HCD membership is therefore derived by traversing the port Attachment tree.
 It is not stored as an independent device-to-HCD relationship.
 
-Detaching a device does not affect its Association or its existence.
+Detaching a device removes only its peer relationship; it does not destroy the device.
 
 ### Cascading
 

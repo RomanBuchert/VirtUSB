@@ -101,8 +101,10 @@ Properties whose semantics are common to both roles belong to the common port
 representation; role-specific properties belong to the corresponding upstream
 or downstream representation.
 
-Association is a reciprocal peer relationship between one downstream port and
-one upstream port. No independent device-to-HCD Association is stored.
+Attachment is represented by a reciprocal peer relationship between one
+downstream port and one upstream port. There is no separate runtime state for
+Association versus Attachment, and no independent device-to-HCD Association
+is stored.
 
 Effective connection properties are derived from the local state of both peer
 ports according to USB rules. They are not maintained as a separate persistent
@@ -117,6 +119,24 @@ decoded directly into the corresponding port state.
 
 This single-source-of-truth model prevents divergence between local port
 state, effective connection state, and serialized bitmap representations.
+
+
+Attachment is represented directly by reciprocal `peer` references between one
+downstream and one upstream `VirtUsbPort`. VirtUSB deliberately does not keep a
+separate Association state or an additional `attached` flag:
+
+```text
+peer == NULL     -> detached
+peer != NULL     -> attached
+```
+
+The term Association may still describe the resulting structural relationship,
+but there is no independent `associated && !attached` runtime state.
+
+The common local port state currently includes `powered` and `suspended`. Both
+describe the state from the owning component's point of view and are
+independent for the two peer ports. Effective USB-visible state is derived from
+both local states according to USB rules.
 
 ### Common Kernel Object Representation
 
@@ -365,7 +385,7 @@ Relationships such as:
 
 ```text
 VirtUsbHcd <-> VirtUsbRHub
-Downstream VirtUsbPort <-> Upstream VirtUsbPort
+Downstream VirtUsbPort <-> Upstream VirtUsbPort (Attachment)
 ```
 
 are represented and maintained by the corresponding functional

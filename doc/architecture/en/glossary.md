@@ -60,22 +60,42 @@ those terms.
 
 ## Association
 
-An **Association** is the local logical relationship between one downstream
-`VirtUsbPort` and one upstream `VirtUsbPort`.
+**Association** is a descriptive term for the structural relationship created
+by attaching one downstream `VirtUsbPort` to one upstream `VirtUsbPort`.
 
-The relationship is represented by reciprocal peer references. It defines the
-parent-child structure of a VirtUSB topology but does not by itself imply that
-the ports are attached, USB-visible, or enumerated.
+VirtUSB does not maintain Association and Attachment as separate runtime
+states. The reciprocal `peer` references are the Attachment:
 
-Only upstream-to-downstream Associations are valid. Each port can participate
-in at most one Association.
+```text
+peer == NULL     -> detached
+peer != NULL     -> attached
+```
+
+Consequently, there is no `associated && !attached` state.
+
+The Attachment defines the parent-child structure of a VirtUSB topology but
+does not by itself imply USB-visible Connection or enumeration.
 
 The HCD to which a device or hub subtree belongs is derived by traversing the
-Association tree toward the `VirtUsbRHub`; it is not stored as a separate
-device-to-HCD Association.
+Attachment tree toward the `VirtUsbRHub`; it is not stored as a separate
+device-to-HCD relationship.
 
-Disassociating the upstream port of a `VirtUsbHub` does not alter Associations
-inside the subtree below that hub.
+Detaching the upstream port of a `VirtUsbHub` does not alter Attachments inside
+the subtree below that hub.
+
+
+## Attachment
+
+**Attachment** is the virtual act and resulting runtime state of plugging one
+upstream `VirtUsbPort` into one downstream `VirtUsbPort`.
+
+It is represented exclusively by reciprocal `peer` references between the two
+ports. No additional `attached` flag is stored.
+
+Attachment is distinct from USB-visible Connection. Attached ports can remain
+not connected from the USB protocol point of view if their local state and the
+USB rules do not permit an effective connection.
+
 
 ## Disassociation
 
@@ -261,6 +281,20 @@ upstream and one downstream `VirtUsbPort`.
 Aggregate bitmaps or packed port-state representations are derived from the
 individual ports only when required for transfer or protocol translation; they
 are not maintained as a second authoritative copy of the state.
+
+The common local state currently includes `powered` and `suspended`.
+
+`powered` is interpreted from the owning component's point of view: a
+downstream port describes whether its hub provides VBUS, while an upstream port
+describes whether its owner operates/powers its USB upstream side.
+
+`suspended` likewise describes the local suspend state as seen by the owning
+component.
+
+Peer values are independent. Effective USB connection properties are derived
+from both local port states according to USB rules rather than being copied
+between the ports.
+
 
 ## VirtUsbHcd
 
