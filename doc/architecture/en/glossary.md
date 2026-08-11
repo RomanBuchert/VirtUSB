@@ -258,7 +258,7 @@ Their implementation may differ from the underlying hardware.
 A **VirtUsbPort** is the internal representation of one virtual USB port.
 
 The same port type is used for upstream and downstream ports. Its role
-identifies which USB semantics apply.
+identifies which hardware semantics apply.
 
 A `VirtUsbPort` is not a VirtUSB Core Component and has no independent
 lifetime or global object identity. It is an integral subobject of its owning
@@ -267,33 +267,50 @@ Core Component.
 A `VirtUsbDev` owns one upstream port. A `VirtUsbHub` owns one upstream port
 and one or more downstream ports. A `VirtUsbRHub` owns downstream ports only.
 
-Each port stores its own local capabilities, properties, and state. Common
-properties are represented independently of the port role; role-specific
-properties belong to the upstream or downstream representation.
+`VirtUsbPort` contains only topology and virtual-hardware information. USB
+2.0 protocol state is intentionally maintained outside the port hardware
+object.
 
-The state of one port is not implicitly copied to its peer. Effective
-connection properties are derived from both associated ports according to USB
-rules.
+Common properties include the reciprocal `peer` relationship and the local
+USB speed capability mask. A downstream port additionally contains its actual
+VBUS/power state and, when applicable, its per-port over-current hardware
+condition.
 
-Association is represented by reciprocal peer references between exactly one
-upstream and one downstream `VirtUsbPort`.
+The `speed` property is a bit mask of speeds supported by the local hardware.
+The current USB operating speed is determined by the USB protocol layer and is
+not stored in `VirtUsbPort`.
 
-Aggregate bitmaps or packed port-state representations are derived from the
-individual ports only when required for transfer or protocol translation; they
-are not maintained as a second authoritative copy of the state.
+USB-defined states such as connection, enable, suspend, reset, `PORT_*`
+status fields, and `C_PORT_*` change fields are not hardware properties of
+`VirtUsbPort`.
 
-The common local state currently includes `powered` and `suspended`.
+Aggregate bitmaps or packed representations are derived only when required
+for transfer or protocol translation and are not maintained as a second
+authoritative copy of hardware state.
 
-`powered` is interpreted from the owning component's point of view: a
-downstream port describes whether its hub provides VBUS, while an upstream port
-describes whether its owner operates/powers its USB upstream side.
+## Hub Power Switching Mode
 
-`suspended` likewise describes the local suspend state as seen by the owning
-component.
+The **Hub Power Switching Mode** is a hardware capability of a `VirtUsbHub` or
+`VirtUsbRHub`.
 
-Peer values are independent. Effective USB connection properties are derived
-from both local port states according to USB rules rather than being copied
-between the ports.
+VirtUSB models the USB 2.0 modes **Ganged** and **Individual**. The historical
+USB 1.0 no-power-switching mode is not modeled.
+
+The capability controls how downstream-port power operations affect the
+individual `VirtUsbPort.powered` hardware states. It does not create a
+separate hub-wide power-state variable.
+
+## Hub Over-Current Mode
+
+The **Hub Over-Current Mode** is a hardware capability of a `VirtUsbHub` or
+`VirtUsbRHub`.
+
+VirtUSB models **Global**, **Per-port**, and **None**.
+
+In Global mode, the current over-current condition belongs to the hub hardware
+state. In Per-port mode, each downstream `VirtUsbPort` has its own
+over-current hardware condition. The USB protocol layer translates this
+hardware model into the corresponding USB 2.0 hub or port status.
 
 
 ## VirtUsbHcd

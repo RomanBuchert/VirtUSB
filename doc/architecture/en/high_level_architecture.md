@@ -120,20 +120,26 @@ The architectural rule is therefore:
 > properties are derived from both ports and the USB rules.
 
 
-The common local port state currently includes at least:
+The common port representation contains only virtual hardware and topology
+properties. USB-defined protocol state is intentionally kept outside
+`VirtUsbPort`.
 
-- `powered`: the local power state from the owner's point of view. For a
-  downstream port this means that the hub provides VBUS at that port. For an
-  upstream port it describes whether the owner operates/powers its USB
-  upstream side. The values of peer ports are independent.
-- `suspended`: the local suspend state from the owner's point of view. A
-  downstream port represents the host/hub-side suspend state; an upstream port
-  represents the suspend state recognized or assumed by the device-side USB
-  interface. The values may differ transiently.
+Current common hardware properties include:
 
-USB-conformant behavior is enforced by the rules governing state transitions
-and by derived connection state; common fields are not implicitly mirrored
-between peer ports.
+- `speed`: a bit mask of USB speeds supported by the local port hardware;
+  the current operating speed is determined by the USB protocol layer and is
+  not stored in `VirtUsbPort`.
+
+Downstream-specific hardware state includes:
+
+- `powered`: whether VBUS is physically/logically present at that downstream
+  port.
+- `over_current`: the local per-port over-current condition, relevant when the
+  owning hub uses per-port over-current protection.
+
+USB states such as suspend, connection, enable, reset, and the USB-defined
+`PORT_*` and `C_PORT_*` fields belong to the USB protocol/hub layer rather
+than to the virtual port hardware model.
 
 Hub-wide bitmaps and other packed representations are likewise not persistent
 parallel state. They are generated from the individual `VirtUsbPort` instances
@@ -350,7 +356,47 @@ Persistent hub-wide status or change bitmaps must not duplicate port state.
 Such representations are generated only when required at an interface
 boundary.
 
+### Hub Hardware Capabilities
+
+`VirtUsbHub` and `VirtUsbRHub` model the relevant hub hardware capabilities
+separately from the current per-port hardware state.
+
+Power switching mode is represented as either:
+
+- **Ganged**: all downstream-port power switches operate together.
+- **Individual**: each downstream port can be switched independently.
+
+The historical USB 1.0 no-power-switching mode is not modeled by VirtUSB.
+
+Regardless of switching mode, the actual VBUS state is stored per downstream
+`VirtUsbPort`. In ganged mode, a power operation updates all downstream ports
+together. A convenience API may expose an explicit "set all ports power"
+operation, but this does not introduce an additional hub-wide power state.
+
+Over-current protection mode is represented as one of:
+
+- **Global**: the hub reports one combined over-current condition.
+- **Per-port**: each downstream port has its own over-current condition.
+- **None**: no over-current protection is modeled.
+
+The current global over-current condition is hub-local hardware state. The
+current per-port over-current condition is downstream-port-local hardware
+state. Only the state corresponding to the configured protection mode is
+semantically active.
+
+The USB hub protocol layer maps these hardware capabilities and conditions to
+the corresponding USB 2.0 hub descriptor, status, and change fields.
+
 ### USB Hub-Port State
+
+The USB-defined hub-port state is a protocol-layer representation. It is
+not stored as hardware bits inside `VirtUsbPort`.
+
+`PORT_CONNECTION`, `PORT_ENABLE`, `PORT_SUSPEND`, `PORT_OVER_CURRENT`,
+`PORT_RESET`, `PORT_POWER`, speed status, and the corresponding `C_PORT_*`
+change fields are maintained or derived by the USB hub protocol/state-machine
+layer as required by USB 2.0 semantics.
+
 
 Downstream ports follow the USB-defined hub-port state model wherever practical.
 

@@ -133,10 +133,16 @@ peer != NULL     -> attached
 The term Association may still describe the resulting structural relationship,
 but there is no independent `associated && !attached` runtime state.
 
-The common local port state currently includes `powered` and `suspended`. Both
-describe the state from the owning component's point of view and are
-independent for the two peer ports. Effective USB-visible state is derived from
-both local states according to USB rules.
+`VirtUsbPort` contains only virtual-hardware and topology state. USB-defined
+protocol state such as suspend, connection, enable, reset, `PORT_*`, and
+`C_PORT_*` does not belong to the port hardware object.
+
+The local `speed` field is a capability bit mask. The current USB operating
+speed is determined by the USB protocol layer and is not stored in
+`VirtUsbPort`.
+
+Downstream-port hardware contains the actual VBUS/power state and, where the
+hub uses per-port protection, the local over-current condition.
 
 ### Common Kernel Object Representation
 
@@ -375,6 +381,33 @@ type-specific resources when the final reference is dropped.
 
 The generic object layer provides the common reference-counting
 mechanism but does not contain type-specific destruction logic.
+
+### Hub Hardware Capabilities
+
+Hub hardware capabilities are modeled independently from USB protocol state.
+
+VirtUSB supports two USB 2.0 power-switching modes:
+
+- `GANGED`
+- `INDIVIDUAL`
+
+The historical USB 1.0 no-power-switching mode is not modeled.
+
+Actual VBUS state remains stored per downstream `VirtUsbPort`. In ganged mode,
+hardware operations change all downstream-port power states together rather
+than introducing a redundant hub-wide power-state field.
+
+VirtUSB supports three over-current protection modes:
+
+- `GLOBAL`
+- `PER_PORT`
+- `NONE`
+
+A global over-current condition is hub-local hardware state. A per-port
+over-current condition is downstream-port-local hardware state.
+
+The USB hub protocol layer converts these hardware capabilities and states into
+the USB 2.0 descriptor, status, and change representations.
 
 ### Object Relationships
 
