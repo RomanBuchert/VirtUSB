@@ -108,8 +108,8 @@ references. There is no separate Association state and no additional
 `attached` flag.
 
 Attach alone does not imply that the host can already detect the device.
-Downstream VBUS state, device-side connection signaling, and USB protocol state
-still determine whether the attachment becomes USB-visible.
+Downstream VBUS state, device hardware conditions, and USB protocol state still
+determine whether the attachment becomes USB-visible.
 
 ## Detach
 
@@ -121,29 +121,37 @@ corresponding USB-visible connection to disappear. Detach does not destroy the
 virtual device, hub, or its backend. A detached Core Component continues to
 exist independently and may later be attached elsewhere.
 
-## Device-Side Connection Signaling
+## Device Power
 
-Device-Side Connection Signaling is the upstream-port hardware state that
-describes whether a virtual device currently signals USB presence to its
-attached downstream peer.
+Device Power describes whether the virtual device hardware is powered.
 
-It is independent of Attachment. A device can remain attached while connection
-signaling is disabled.
+This is distinct from the USB hub-port `PORT_POWER` status.
 
-The device implementation controls this state through the VirtUSB device-side
-interface. Internal device conditions such as self-power, firmware state,
-controller state, or simulated faults remain outside VirtUSB.
+A device may be attached while not powered, corresponding to the USB-defined
+possibility of an Attached but not Powered device.
 
-This state is intended to correspond to device-controller connect/disconnect
-operations and is one input to USB-visible connection detection.
+## USB Hardware Availability
+
+USB Hardware Availability is a VirtUSB-specific device-hardware condition.
+
+It describes whether the virtual device-side USB controller and the device
+hardware required for USB communication are operational.
+
+USB Hardware Availability is not a USB-defined device state. It is an internal
+or externally simulated prerequisite from which USB-visible behavior may be
+derived.
+
+A powered-off device cannot have USB Hardware Availability. A powered device
+may nevertheless have unavailable USB hardware if the represented virtual
+hardware model requires that distinction.
 
 ## Port Power
 
 Port Power refers to the USB-defined protocol-layer power status represented by
 `PORT_POWER`.
 
-The actual virtual-hardware VBUS state of a downstream port is stored in that
-`VirtUsbPort` as `powered`.
+It is distinct from Device Power. The actual virtual-hardware VBUS state of a
+downstream port is stored in that `VirtUsbPort` as `powered`.
 
 The hub power-switching capability defines whether downstream VBUS is switched
 individually or ganged. The USB hub protocol layer maps this hardware state and
@@ -160,9 +168,9 @@ For a powered port, `PORT_CONNECTION` reflects whether an attached device is
 detected. In the USB-defined `Powered-off` or `Disconnected` port states,
 `PORT_CONNECTION` is clear.
 
-VirtUSB therefore determines USB Connection from the relevant Attachment,
-downstream VBUS, device-side connection signaling, and USB hub-port state
-instead of exposing `PORT_CONNECTION` as an arbitrary user-space switch.
+VirtUSB therefore derives USB Connection from the relevant attachment, device
+hardware, and USB hub-port state instead of exposing it as an arbitrary
+user-space switch.
 
 ## USB Disconnect
 
@@ -187,8 +195,8 @@ meaning:
 - Configured
 - Suspended
 
-These are USB device states and are distinct from VirtUSB-specific topology
-and device-side connection-signaling state.
+These are USB device states and are distinct from VirtUSB-specific management
+state such as Attachment/topology state and USB Hardware Availability.
 
 The USB-defined Attached state begins when the device is attached to the USB.
 The Powered state additionally requires power. Reset moves a powered device to

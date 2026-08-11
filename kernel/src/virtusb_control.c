@@ -37,7 +37,7 @@ static void virtusb_control_build_port_state(const struct virtusb_hub *hub,
    state->change = 0U;
    state->speed = VIRTUSB_PORT_SPEED_NONE;
 
-   if (virtusb_control_state_test(hub->usb.connected, port)) {
+   if ((port > 0U) && virtusb_hub_port_is_connected(hub, port)) {
       state->status |= VIRTUSB_PORT_STATUS_CONNECTED;
    }
 
@@ -49,7 +49,8 @@ static void virtusb_control_build_port_state(const struct virtusb_hub *hub,
       state->status |= VIRTUSB_PORT_STATUS_SUSPENDED;
    }
 
-   if (virtusb_control_state_test(hub->usb.over_current, port)) {
+   if (((port == 0U) && virtusb_hub_is_over_current(hub)) ||
+       ((port > 0U) && virtusb_hub_port_is_over_current(hub, port))) {
       state->status |= VIRTUSB_PORT_STATUS_OVER_CURRENT;
    }
 
@@ -57,7 +58,7 @@ static void virtusb_control_build_port_state(const struct virtusb_hub *hub,
       state->status |= VIRTUSB_PORT_STATUS_RESET;
    }
 
-   if (virtusb_control_state_test(hub->usb.powered, port)) {
+   if ((port > 0U) && virtusb_hub_port_is_powered(hub, port)) {
       state->status |= VIRTUSB_PORT_STATUS_POWER;
    }
 

@@ -128,11 +128,6 @@ Current common hardware properties include:
   the current operating speed is determined by the USB protocol layer and is
   not stored in `VirtUsbPort`.
 
-Upstream-specific hardware state includes:
-
-- device-side connection signaling: whether the attached device currently
-  signals USB presence to its downstream peer.
-
 Downstream-specific hardware state includes:
 
 - `powered`: whether VBUS is physically/logically present at that downstream
@@ -274,7 +269,9 @@ The following state and relationships are specific to VirtUSB:
 
 - Attachment and Detachment of virtual ports
 - backend ownership and lifecycle
-- device-side USB connection signaling
+- Device Power
+- USB Hardware Availability
+- optional simulated device-hardware fault or availability conditions
 
 Attachment establishes the local parent-child topology relationship directly
 between one downstream `VirtUsbPort` and one upstream `VirtUsbPort`. It is
@@ -305,33 +302,27 @@ The relevant USB-defined states are:
 
 These states retain their USB specification meaning.
 
-An attached device may exist without VBUS being present at its upstream port.
-For USB state-machine purposes, the device does not enter the USB-defined
-Powered state until it is attached and VBUS is present. It must not respond to
-normal bus transactions until it has received reset signaling. Completion of reset places
+An attached device may exist without being powered. After power is available,
+the device is in the Powered state but must not respond to normal bus
+transactions until it has received reset signaling. Completion of reset places
 the device in Default. Address assignment and configuration then move it
 through Address and Configured according to normal USB enumeration.
 
 VirtUSB Attachment/topology state is not itself part of this USB device-state machine.
 
-### Device-Side Connection Signaling
+### Device Hardware State
 
-VirtUSB does not model a generic device-side `USB Hardware Availability`
-condition.
+Device hardware state describes conditions of the simulated device that are not
+themselves USB protocol states.
 
-Whether the simulated device hardware, controller, firmware, or internal power
-domains are operational belongs to the device implementation.
+Examples include Device Power and USB Hardware Availability.
 
-VirtUSB models only the USB-facing result that is relevant to the virtual bus:
-an upstream port can either signal USB presence or not signal USB presence.
+Device Power represents whether the virtual device hardware is powered. USB
+Hardware Availability represents whether the virtual device-side USB controller
+and required USB hardware are operational.
 
-This connection-signaling state is controlled by the device side and is
-independent of the Attachment relationship. It is intended to map directly to
-device-controller operations such as connect and disconnect.
-
-A device implementation may use any internal conditions it chooses, including
-its own power state or fault model, to decide when to enable or disable this
-signaling.
+These conditions may influence USB-visible behavior but do not replace the
+USB-defined device states.
 
 ### Canonical Port Representation
 
@@ -343,9 +334,8 @@ for both roles. Role-specific state is represented separately for upstream and
 downstream ports.
 
 Each port stores only its own local state. Values that describe an effective
-USB-visible connection are determined from the attached peer relationship,
-downstream VBUS, device-side connection signaling, and the applicable USB
-rules. They are not redundantly persisted as a second connection state.
+connection are calculated from both attached peer ports according to USB rules
+and are not redundantly persisted.
 
 Persistent hub-wide status or change bitmaps must not duplicate port state.
 Such representations are generated only when required at an interface
@@ -416,8 +406,8 @@ USB-defined status fields, including:
 - `PORT_POWER`
 
 `PORT_POWER` is the USB-defined protocol-layer representation of downstream
-port power. The actual virtual-hardware VBUS state is stored as the downstream
-`VirtUsbPort.powered` state; the USB hub
+port power. It is distinct from Device Power. The actual virtual-hardware VBUS
+state is stored as the downstream `VirtUsbPort.powered` state; the USB hub
 protocol layer maps the hardware state and hub power-switching semantics to the
 USB-defined `PORT_POWER` status.
 
@@ -444,7 +434,7 @@ Device object exists
 Device attached to downstream port
 (reciprocal peer relationship)
         +
-Device-side connection signaling is enabled
+Device power / USB hardware conditions permit operation
         +
 Downstream VBUS / USB hub protocol state permits detection
         |
@@ -501,7 +491,8 @@ virtual hardware, for example:
 
 - Attach
 - Detach
-- device-side connect/disconnect signaling
+- Device Power changes
+- USB Hardware Availability changes
 - simulated hardware fault conditions
 
 **Derived USB-visible transitions** result from the state model rather than from

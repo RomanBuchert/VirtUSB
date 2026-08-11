@@ -18,6 +18,8 @@ add_linux_kernel_module(
    SOURCES
       src/virtusb_module.c
       src/virtusb_control.c
+      src/virtusb_port.c
+      src/virtusb_device.c
       src/virtusb_hub.c
       src/virtusb_root_hub.c
       src/virtusb_hcd.c
