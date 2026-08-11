@@ -327,3 +327,29 @@ Erst danach Kernel/User-Interface und Kommunikationsprotokoll spezifizieren.
 
 Fazit: Der Stand ist für ein weiteres Architekturreview geeignet, aber noch nicht für einen Baseline Freeze oder den belastbaren Beginn der Interface-Spezifikation.
 ```
+
+---
+
+## V1.x follow-up candidates
+
+The following items are deliberately deferred and are not part of the initial
+`VirtUsbPort` hardware model.
+
+### Generic port hardware fault injection
+
+Evaluate whether a later V1.x release should support generic virtual port/PHY
+fault injection, for example:
+
+- unavailable or disabled port hardware,
+- unavailable or disabled virtual PHY,
+- deliberately non-operational USB-side hardware while the owning object still
+  exists.
+
+Do not introduce a generic `available`, `operational`, or similar
+`VirtUsbPort` flag until a concrete simulation use case and its semantics have
+been defined.
+
+The initial V1 port model remains limited to the hardware properties required
+for normal topology, speed capability, downstream VBUS power, and
+over-current behavior.
+
