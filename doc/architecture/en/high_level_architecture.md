@@ -102,17 +102,15 @@ A `VirtUsbPort` describes only its own local capabilities, properties, and
 state. These values are authoritative for that port and are independent of the
 values stored by another port.
 
-For example, an upstream and a downstream port each describe their own power
-state and supported USB speed. The values do not have to be identical. This is
-required, among other cases, to model self-powered devices correctly.
+For example, an upstream and a downstream port each describe their own
+supported USB-speed capabilities. Downstream ports additionally describe their
+actual local VBUS state.
 
 Properties of the effective USB connection are not stored as a second,
-persistent state representation. They are derived from the local properties
-and state of both associated ports according to the applicable USB rules.
-
-For example, if a high-speed-capable downstream port is associated with a
-full-speed-only upstream port, the effective connection cannot operate faster
-than full speed.
+persistent state representation inside `VirtUsbPort`. The port capabilities
+constrain the possible connection properties, while the current USB operating
+state, including the current operating speed, is determined by the USB
+protocol layer according to the applicable USB rules.
 
 The architectural rule is therefore:
 
@@ -267,39 +265,26 @@ USB-visible device or hub-port state.
 
 ### VirtUSB-Specific Management State
 
-The following relationships are specific to VirtUSB:
+The following state and relationships are specific to VirtUSB:
 
-- Association and Disassociation
+- Attachment and Detachment of virtual ports
 - backend ownership and lifecycle
+- Device Power
 - USB Hardware Availability
-- optional simulated hardware fault or availability conditions
+- optional simulated device-hardware fault or availability conditions
 
-Association assigns a `VirtUsbDev` or `VirtUsbHub` to one specific downstream
-port of a `VirtUsbRHub` or `VirtUsbHub`. It establishes the local parent-child
-relationship and therefore defines the structure of the VirtUSB topology.
-Association does not by itself mean that the device is attached or USB-visible.
+Attachment establishes the local parent-child topology relationship directly
+between one downstream `VirtUsbPort` and one upstream `VirtUsbPort`. It is
+represented by reciprocal `peer` references and there is no separate
+Association state.
 
-The HCD to which an associated object belongs is derived by traversing its
-parent relationships towards the `VirtUsbRHub`. There is no independent
-device-to-HCD Association. Consequently, moving an associated hub subtree to a
-different topology requires changing only the Association of the subtree root;
-the Associations within that subtree remain unchanged.
+The HCD to which an attached object belongs is derived by traversing the
+Attachment tree towards the `VirtUsbRHub`. There is no independent
+device-to-HCD relationship.
 
-Association and Attachment are therefore distinct:
-
-```text
-Virtual device exists
-        |
-        v
-Associated with one downstream port
-(topology position defined)
-        |
-        v
-Attached at that associated port
-```
-
-A device may remain associated while detached and may later be attached again
-at its associated port without recreating the device or backend.
+A detached `VirtUsbDev` or `VirtUsbHub` continues to exist independently of
+topology membership and may later be attached to any compatible downstream
+port.
 
 ### USB Device State
 
@@ -323,7 +308,7 @@ transactions until it has received reset signaling. Completion of reset places
 the device in Default. Address assignment and configuration then move it
 through Address and Configured according to normal USB enumeration.
 
-VirtUSB-specific Association is not part of this USB device-state machine.
+VirtUSB Attachment/topology state is not itself part of this USB device-state machine.
 
 ### Device Hardware State
 
@@ -349,7 +334,7 @@ for both roles. Role-specific state is represented separately for upstream and
 downstream ports.
 
 Each port stores only its own local state. Values that describe an effective
-connection are calculated from both associated ports according to USB rules
+connection are calculated from both attached peer ports according to USB rules
 and are not redundantly persisted.
 
 Persistent hub-wide status or change bitmaps must not duplicate port state.
@@ -420,9 +405,11 @@ USB-defined status fields, including:
 - `PORT_RESET`
 - `PORT_POWER`
 
-`PORT_POWER` is the USB-defined logical port-power state. It is not an alias for
-Device Power and does not automatically imply a separately modeled physical
-power-supply condition.
+`PORT_POWER` is the USB-defined protocol-layer representation of downstream
+port power. It is distinct from Device Power. The actual virtual-hardware VBUS
+state is stored as the downstream `VirtUsbPort.powered` state; the USB hub
+protocol layer maps the hardware state and hub power-switching semantics to the
+USB-defined `PORT_POWER` status.
 
 ### Attachment and USB Connection
 
@@ -441,14 +428,15 @@ the USB-defined `Powered-off` or `Disconnected` state reports no connection.
 The relationship is therefore conceptually:
 
 ```text
-Device associated with controller
+Device object exists
         |
         v
-Device attached to port
+Device attached to downstream port
+(reciprocal peer relationship)
         +
 Device power / USB hardware conditions permit operation
         +
-USB hub port is not Powered-off
+Downstream VBUS / USB hub protocol state permits detection
         |
         v
 Attachment is detectable
@@ -501,8 +489,6 @@ VirtUSB distinguishes three categories of state transition.
 **VirtUSB management operations** manipulate project-specific relationships or
 virtual hardware, for example:
 
-- Associate
-- Disassociate
 - Attach
 - Detach
 - Device Power changes

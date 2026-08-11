@@ -97,46 +97,38 @@ not connected from the USB protocol point of view if their local state and the
 USB rules do not permit an effective connection.
 
 
-## Disassociation
-
-Disassociation removes the VirtUSB-specific Association between a virtual
-device or hub and its parent downstream port.
-
-An attached object must be detached before this Association can be removed.
-Disassociating the root of a hub subtree does not modify the Associations within
-that subtree.
 
 ## Attach
 
-Attach makes an associated virtual USB device or hub present at its associated
-downstream port from the virtual hardware perspective.
+Attach establishes a virtual USB topology relationship by plugging one
+upstream `VirtUsbPort` into one downstream `VirtUsbPort`.
 
-VirtUSB uses the term Attach in the USB sense as closely as practical. Attach
-does not define the topology position itself; that position is defined by
-Association.
+The resulting Attachment is represented exclusively by reciprocal `peer`
+references. There is no separate Association state and no additional
+`attached` flag.
 
-Attach alone does not imply that the host can already detect the device. Port
-power state, device power state, and the availability of the virtual USB
-hardware still determine whether the attachment becomes USB-visible.
+Attach alone does not imply that the host can already detect the device.
+Downstream VBUS state, device hardware conditions, and USB protocol state still
+determine whether the attachment becomes USB-visible.
 
 ## Detach
 
-Detach removes a virtual USB device from its downstream port.
+Detach removes the reciprocal `peer` relationship between an upstream and a
+downstream `VirtUsbPort`.
 
 If the device was visible to the host, detaching it necessarily causes the
-corresponding USB-visible connection to disappear. Detach does not by itself
-destroy the virtual device or its backend and does not necessarily remove its
-VirtUSB Association.
+corresponding USB-visible connection to disappear. Detach does not destroy the
+virtual device, hub, or its backend. A detached Core Component continues to
+exist independently and may later be attached elsewhere.
 
 ## Device Power
 
 Device Power describes whether the virtual device hardware is powered.
 
-This is distinct from the USB hub-port `PORT_POWER` status and from the
-VirtUSB-specific Association of the device.
+This is distinct from the USB hub-port `PORT_POWER` status.
 
-A device may be associated and attached while not powered, corresponding to the
-USB-defined possibility of an Attached but not Powered device.
+A device may be attached while not powered, corresponding to the USB-defined
+possibility of an Attached but not Powered device.
 
 ## USB Hardware Availability
 
@@ -155,15 +147,15 @@ hardware model requires that distinction.
 
 ## Port Power
 
-Port Power refers to the USB-defined logical power-control state represented by
+Port Power refers to the USB-defined protocol-layer power status represented by
 `PORT_POWER`.
 
-It reflects whether a downstream port is in the USB hub state `Powered-off` or
-is not in that state. It must not be treated as an alias for Device Power or for
-a separate simulated physical power-supply condition.
+It is distinct from Device Power. The actual virtual-hardware VBUS state of a
+downstream port is stored in that `VirtUsbPort` as `powered`.
 
-Where a virtual hardware model requires additional power-supply behavior, that
-behavior is modeled as a separate VirtUSB-specific hardware condition.
+The hub power-switching capability defines whether downstream VBUS is switched
+individually or ganged. The USB hub protocol layer maps this hardware state and
+switching behavior to the USB-defined `PORT_POWER` status.
 
 ## USB Connection
 
@@ -189,7 +181,7 @@ It may result from Detach, loss of the conditions required for connection
 detection, a USB-defined port-state transition, or another condition that
 causes the port to stop reporting an attached device.
 
-A USB Disconnect does not necessarily imply Detach or Disassociation.
+A USB Disconnect does not necessarily imply Detach.
 
 ## USB Device States
 
@@ -204,7 +196,7 @@ meaning:
 - Suspended
 
 These are USB device states and are distinct from VirtUSB-specific management
-state such as Association and USB Hardware Availability.
+state such as Attachment/topology state and USB Hardware Availability.
 
 The USB-defined Attached state begins when the device is attached to the USB.
 The Powered state additionally requires power. Reset moves a powered device to
@@ -327,7 +319,7 @@ topology.
 A **VirtUsbRHub** (Virtual USB Root Hub) is the virtual counterpart of
 the root hub of a physical USB Host Controller.
 
-It is directly associated with a `VirtUsbHcd` and provides downstream
+It belongs directly to a `VirtUsbHcd` and provides downstream
 ports to which virtual USB devices (`VirtUsbDev`) or additional virtual
 USB hubs (`VirtUsbHub`) can be attached.
 

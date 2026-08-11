@@ -21,8 +21,8 @@ The High-Level Architecture establishes that the existence of a Core
 Component is independent of its integration into a VirtUSB topology.
 
 In particular, detaching a `VirtUsbDev` or `VirtUsbHub` from a downstream
-port does not destroy the corresponding component. Association,
-attachment, USB-visible state, and object existence therefore represent
+port does not destroy the corresponding component. Attachment,
+USB-visible state, and object existence therefore represent
 different concepts and must not implicitly control each other's
 lifetime.
 
@@ -67,8 +67,8 @@ VirtUsbDev
 
 A VirtUSB object has its own identity and managed lifetime.
 
-Object existence is independent of relationships such as association,
-attachment, or membership in a VirtUSB topology.
+Object existence is independent of Attachment or membership in a VirtUSB
+topology.
 
 Consequently:
 
@@ -106,10 +106,11 @@ downstream port and one upstream port. There is no separate runtime state for
 Association versus Attachment, and no independent device-to-HCD Association
 is stored.
 
-Effective connection properties are derived from the local state of both peer
-ports according to USB rules. They are not maintained as a separate persistent
-link-state copy. For example, each port stores its own supported speed; the
-effective connection speed is derived from the capabilities of both ports.
+Effective USB-visible properties are determined from the virtual hardware
+state and the applicable USB protocol rules. They are not maintained as a
+redundant persistent copy inside `VirtUsbPort`. For example, each port stores
+only its supported-speed capability mask; the current USB operating speed is
+determined by the USB protocol layer and is not stored in `VirtUsbPort`.
 
 Packed bitmaps and other aggregate representations are also not maintained as
 a second copy of port state. They are generated from `VirtUsbPort` instances
@@ -197,7 +198,6 @@ concrete Core Components.
 In particular, it does not manage:
 
 - topology relationships,
-- association,
 - attachment,
 - USB protocol state,
 - hub or port state machines,
@@ -424,27 +424,26 @@ Downstream VirtUsbPort <-> Upstream VirtUsbPort (Attachment)
 are represented and maintained by the corresponding functional
 components.
 
-Association is a local parent-child relationship between a downstream
-port and a `VirtUsbDev` or `VirtUsbHub`. Membership in a particular
-`VirtUsbHcd` topology is derived by traversing these relationships to the
-`VirtUsbRHub`; it is not represented by an independent device-to-HCD
-relationship.
+Attachment is the local parent-child topology relationship between one
+downstream `VirtUsbPort` and one upstream `VirtUsbPort`. Membership in a
+particular `VirtUsbHcd` topology is derived by traversing these reciprocal
+peer relationships to the `VirtUsbRHub`; it is not represented by an
+independent device-to-HCD relationship.
 
-Consequently, moving the root of an associated hub subtree to another
-VirtUSB topology does not require updating the Associations within that
-subtree. Only the Association of the subtree root changes.
+Consequently, moving the root of an attached hub subtree to another VirtUSB
+topology requires changing only the Attachment of the subtree root. The
+Attachments within that subtree remain unchanged.
 
 In particular, the following concepts remain distinct:
 
 ```text
 Object existence
-Association
-Attachment
+Attachment / topology relationship
 USB-visible state
 ```
 
-Changing one of these relationships or states does not implicitly
-destroy the object.
+Changing an Attachment or USB-visible state does not implicitly destroy the
+object.
 
 ### Kernel, UAPI, Library, and Wrapper Separation
 
@@ -509,16 +508,16 @@ state.
 
 ### HCD-Owned Device Lifetime
 
-A `VirtUsbDev` is owned by the `VirtUsbHcd` with which it is associated.
+A `VirtUsbDev` is owned by the `VirtUsbHcd` whose topology currently contains it.
 
 #### Assessment
 
 Rejected.
 
-Association is a relationship between independently existing objects and
-must not implicitly determine device lifetime.
+Topology membership is a relationship between independently existing objects
+and must not implicitly determine device lifetime.
 
-A device must be able to exist while unassociated and detached.
+A device must be able to exist while detached and outside any HCD topology.
 
 ### Per-Type Object ID Namespaces
 
