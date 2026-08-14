@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -97,6 +98,16 @@ struct virtusb_status {
 
 struct virtusb_handle;
 
+typedef uint32_t virtusb_object_id_t;
+
+#define VIRTUSB_OBJECT_ID_INVALID ((virtusb_object_id_t)0U)
+
+#define VIRTUSB_DEVICE_SPEED_LOW  (1U << 0)
+#define VIRTUSB_DEVICE_SPEED_FULL (1U << 1)
+#define VIRTUSB_DEVICE_SPEED_HIGH (1U << 2)
+#define VIRTUSB_DEVICE_SPEED_ALL \
+   (VIRTUSB_DEVICE_SPEED_LOW | VIRTUSB_DEVICE_SPEED_FULL | VIRTUSB_DEVICE_SPEED_HIGH)
+
 /**
  * virtusb_open() - Open one VirtUSB host-controller instance
  * @instance: Zero-based VirtUSB HCD instance number.
@@ -141,6 +152,30 @@ int virtusb_get_port_status(struct virtusb_handle *handle,
                             uint32_t hub_id,
                             uint32_t port,
                             struct virtusb_status *status);
+
+/**
+ * virtusb_device_create() - Create a virtual USB device
+ * @handle: Open VirtUSB Control-Plane handle.
+ * @speed_caps: Supported-speed capability mask.
+ * @object_id: Receives the global runtime object ID.
+ *
+ * Return: 0 on success or a negative errno value on failure.
+ */
+int virtusb_device_create(struct virtusb_handle *handle,
+                          uint32_t speed_caps,
+                          virtusb_object_id_t *object_id);
+
+/**
+ * virtusb_device_destroy() - Destroy a virtual USB device
+ * @handle: Open VirtUSB Control-Plane handle.
+ * @object_id: Global runtime object ID.
+ * @force: Request explicit forced destruction.
+ *
+ * Return: 0 on success or a negative errno value on failure.
+ */
+int virtusb_device_destroy(struct virtusb_handle *handle,
+                           virtusb_object_id_t object_id,
+                           bool force);
 
 #ifdef __cplusplus
 }

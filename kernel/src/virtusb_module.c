@@ -8,6 +8,8 @@
 
 #include "virtusb_control.h"
 #include "virtusb_hcd.h"
+#include "virtusb_device.h"
+#include "virtusb_object_manager.h"
 
 #define VIRTUSB_DEFAULT_HCD_COUNT 1U
 #define VIRTUSB_MAX_HCD_COUNT     31U
@@ -44,11 +46,14 @@ static int __init virtusb_module_init(void)
       return -EINVAL;
    }
 
+   virtusb_object_manager_init();
+
    virtusb_hcd_devices = kcalloc(hcd_count,
                                  sizeof(*virtusb_hcd_devices),
                                  GFP_KERNEL);
    if (virtusb_hcd_devices == NULL) {
-      return -ENOMEM;
+      ret = -ENOMEM;
+      goto exit_object_manager;
    }
 
    ret = virtusb_control_register(hcd_count);
@@ -96,11 +101,21 @@ free_hcd_devices:
    kfree(virtusb_hcd_devices);
    virtusb_hcd_devices = NULL;
 
+exit_object_manager:
+   virtusb_object_manager_exit();
+
    return ret;
 }
 
 static void __exit virtusb_module_exit(void)
 {
+   /*
+    * Devices must be disconnected and detached before their HCD topology is
+    * removed. Open Control-Plane file descriptors hold THIS_MODULE references,
+    * so no userspace ioctl can race an already committed module unload.
+    */
+   virtusb_device_shutdown_all();
+
    virtusb_module_destroy_hcds();
 
    virtusb_hcd_driver_unregister();
@@ -108,6 +123,8 @@ static void __exit virtusb_module_exit(void)
 
    kfree(virtusb_hcd_devices);
    virtusb_hcd_devices = NULL;
+
+   virtusb_object_manager_exit();
 
    pr_info("VirtUSB module unloaded\n");
 }

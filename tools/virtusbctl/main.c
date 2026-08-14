@@ -13,7 +13,11 @@ static void virtusbctl_print_usage(const char *program)
 {
    fprintf(stderr,
            "Usage:\n"
-           "  %s [-d INSTANCE] status [PORT]\n",
+           "  %s [-d INSTANCE] status [PORT]\n"
+           "  %s [-d INSTANCE] device create SPEED[,SPEED...]\n"
+           "  %s [-d INSTANCE] device destroy OBJECT_ID [--force]\n",
+           program,
+           program,
            program);
 }
 
@@ -120,6 +124,112 @@ static int virtusbctl_parse_unsigned(const char *text, unsigned int *value)
    return 0;
 }
 
+static int virtusbctl_parse_speed_caps(const char *text, uint32_t *speed_caps)
+{
+   char buffer[64];
+   char *token;
+   char *saveptr = NULL;
+   uint32_t caps = 0U;
+   size_t length;
+
+   if ((text == NULL) || (speed_caps == NULL)) {
+      return -EINVAL;
+   }
+
+   length = strlen(text);
+   if ((length == 0U) || (length >= sizeof(buffer))) {
+      return -EINVAL;
+   }
+
+   memcpy(buffer, text, length + 1U);
+
+   for (token = strtok_r(buffer, ",", &saveptr);
+        token != NULL;
+        token = strtok_r(NULL, ",", &saveptr)) {
+      if (strcmp(token, "low") == 0) {
+         caps |= VIRTUSB_DEVICE_SPEED_LOW;
+      } else if (strcmp(token, "full") == 0) {
+         caps |= VIRTUSB_DEVICE_SPEED_FULL;
+      } else if (strcmp(token, "high") == 0) {
+         caps |= VIRTUSB_DEVICE_SPEED_HIGH;
+      } else {
+         return -EINVAL;
+      }
+   }
+
+   if (caps == 0U) {
+      return -EINVAL;
+   }
+
+   *speed_caps = caps;
+
+   return 0;
+}
+
+static int virtusbctl_device_create(unsigned int instance, uint32_t speed_caps)
+{
+   struct virtusb_handle *handle;
+   virtusb_object_id_t object_id;
+   int ret;
+
+   ret = virtusb_open(instance, &handle);
+   if (ret < 0) {
+      fprintf(stderr,
+              "Failed to open /dev/virtusb%u: %s\n",
+              instance,
+              strerror(-ret));
+      return EXIT_FAILURE;
+   }
+
+   ret = virtusb_device_create(handle, speed_caps, &object_id);
+   if (ret < 0) {
+      fprintf(stderr, "Failed to create device: %s\n", strerror(-ret));
+      virtusb_close(handle);
+      return EXIT_FAILURE;
+   }
+
+   printf("Device created: %u\n", object_id);
+
+   virtusb_close(handle);
+
+   return EXIT_SUCCESS;
+}
+
+static int virtusbctl_device_destroy(unsigned int instance,
+                                     virtusb_object_id_t object_id,
+                                     bool force)
+{
+   struct virtusb_handle *handle;
+   int ret;
+
+   ret = virtusb_open(instance, &handle);
+   if (ret < 0) {
+      fprintf(stderr,
+              "Failed to open /dev/virtusb%u: %s\n",
+              instance,
+              strerror(-ret));
+      return EXIT_FAILURE;
+   }
+
+   ret = virtusb_device_destroy(handle, object_id, force);
+   if (ret < 0) {
+      fprintf(stderr,
+              "Failed to destroy device %u: %s\n",
+              object_id,
+              strerror(-ret));
+      virtusb_close(handle);
+      return EXIT_FAILURE;
+   }
+
+   printf("Device destroyed: %u%s\n",
+          object_id,
+          force ? " (forced)" : "");
+
+   virtusb_close(handle);
+
+   return EXIT_SUCCESS;
+}
+
 static int virtusbctl_status(unsigned int instance, unsigned int port)
 {
    struct virtusb_handle *handle;
@@ -177,7 +287,10 @@ static int virtusbctl_status(unsigned int instance, unsigned int port)
 int main(int argc, char **argv)
 {
    unsigned int instance = 0U;
+   unsigned int value;
    unsigned int port = 0U;
+   uint32_t speed_caps;
+   bool force = false;
    int argument = 1;
    int ret;
 
@@ -198,27 +311,89 @@ int main(int argc, char **argv)
       ++argument;
    }
 
-   if ((argument >= argc) || (strcmp(argv[argument], "status") != 0)) {
+   if (argument >= argc) {
+      virtusbctl_print_usage(argv[0]);
+      return EXIT_FAILURE;
+   }
+
+   if (strcmp(argv[argument], "status") == 0) {
+      ++argument;
+
+      if (argument < argc) {
+         ret = virtusbctl_parse_unsigned(argv[argument], &port);
+         if ((ret < 0) || (port > VIRTUSB_MAX_PORTS)) {
+            fprintf(stderr, "Invalid port: %s\n", argv[argument]);
+            return EXIT_FAILURE;
+         }
+
+         ++argument;
+      }
+
+      if (argument != argc) {
+         virtusbctl_print_usage(argv[0]);
+         return EXIT_FAILURE;
+      }
+
+      return virtusbctl_status(instance, port);
+   }
+
+   if (strcmp(argv[argument], "device") != 0) {
       virtusbctl_print_usage(argv[0]);
       return EXIT_FAILURE;
    }
 
    ++argument;
-
-   if (argument < argc) {
-      ret = virtusbctl_parse_unsigned(argv[argument], &port);
-      if ((ret < 0) || (port > VIRTUSB_MAX_PORTS)) {
-         fprintf(stderr, "Invalid port: %s\n", argv[argument]);
-         return EXIT_FAILURE;
-      }
-
-      ++argument;
-   }
-
-   if (argument != argc) {
+   if (argument >= argc) {
       virtusbctl_print_usage(argv[0]);
       return EXIT_FAILURE;
    }
 
-   return virtusbctl_status(instance, port);
+   if (strcmp(argv[argument], "create") == 0) {
+      ++argument;
+
+      if ((argument >= argc) ||
+          (virtusbctl_parse_speed_caps(argv[argument], &speed_caps) < 0)) {
+         fprintf(stderr, "Invalid device speed capability list\n");
+         return EXIT_FAILURE;
+      }
+
+      ++argument;
+      if (argument != argc) {
+         virtusbctl_print_usage(argv[0]);
+         return EXIT_FAILURE;
+      }
+
+      return virtusbctl_device_create(instance, speed_caps);
+   }
+
+   if (strcmp(argv[argument], "destroy") == 0) {
+      ++argument;
+
+      if ((argument >= argc) ||
+          (virtusbctl_parse_unsigned(argv[argument], &value) < 0) ||
+          (value == VIRTUSB_OBJECT_ID_INVALID)) {
+         fprintf(stderr, "Invalid object ID\n");
+         return EXIT_FAILURE;
+      }
+
+      ++argument;
+
+      if ((argument < argc) && (strcmp(argv[argument], "--force") == 0)) {
+         force = true;
+         ++argument;
+      }
+
+      if (argument != argc) {
+         virtusbctl_print_usage(argv[0]);
+         return EXIT_FAILURE;
+      }
+
+      return virtusbctl_device_destroy(instance,
+                                       (virtusb_object_id_t)value,
+                                       force);
+   }
+
+   virtusbctl_print_usage(argv[0]);
+
+   return EXIT_FAILURE;
 }

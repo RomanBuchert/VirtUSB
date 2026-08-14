@@ -13,6 +13,8 @@
 
 #include "virtusb_control.h"
 #include "virtusb_hcd.h"
+#include "virtusb_device.h"
+#include "virtusb_object_manager.h"
 #include "virtusb_hub.h"
 
 #define VIRTUSB_CONTROL_DEVICE_NAME "virtusb"
@@ -132,6 +134,84 @@ static long virtusb_control_get_port_status(struct virtusb_control *control,
    return 0;
 }
 
+static bool virtusb_control_speed_caps_valid(__u32 speed_caps)
+{
+   return (speed_caps != 0U) &&
+          ((speed_caps & ~VIRTUSB_SPEED_CAP_ALL) == 0U);
+}
+
+static long virtusb_control_device_create(void __user *argp)
+{
+   struct virtusb_device_create request;
+   struct virtusb_device *device;
+
+   if (copy_from_user(&request, argp, sizeof(request)) != 0U) {
+      return -EFAULT;
+   }
+
+   if (!virtusb_control_speed_caps_valid(request.speed_caps)) {
+      return -EINVAL;
+   }
+
+   device = virtusb_device_create((u8)request.speed_caps);
+   if (IS_ERR(device)) {
+      return PTR_ERR(device);
+   }
+
+   request.object_id = device->object.id;
+
+   if (copy_to_user(argp, &request, sizeof(request)) != 0U) {
+      (void)virtusb_device_destroy(device, true);
+      virtusb_object_put(&device->object);
+      return -EFAULT;
+   }
+
+   /*
+    * Creation returns the object ID to userspace. The registry reference keeps
+    * the device alive after this temporary creator reference is released.
+    */
+   virtusb_object_put(&device->object);
+
+   return 0;
+}
+
+static long virtusb_control_device_destroy(void __user *argp)
+{
+   struct virtusb_device_destroy request;
+   struct virtusb_object *object;
+   struct virtusb_device *device;
+   bool force;
+   int ret;
+
+   if (copy_from_user(&request, argp, sizeof(request)) != 0U) {
+      return -EFAULT;
+   }
+
+   if ((request.object_id == VIRTUSB_OBJECT_ID_INVALID) ||
+       ((request.flags & ~VIRTUSB_DEVICE_DESTROY_FLAGS) != 0U)) {
+      return -EINVAL;
+   }
+
+   object = virtusb_object_lookup(request.object_id);
+   if (object == NULL) {
+      return -ENOENT;
+   }
+
+   if (object->type != VIRTUSB_OBJECT_TYPE_DEVICE) {
+      virtusb_object_put(object);
+      return -EINVAL;
+   }
+
+   device = container_of(object, struct virtusb_device, object);
+   force = (request.flags & VIRTUSB_DEVICE_DESTROY_FORCE) != 0U;
+
+   ret = virtusb_device_destroy(device, force);
+
+   virtusb_object_put(object);
+
+   return ret;
+}
+
 static long virtusb_control_ioctl(struct file *file,
                                   unsigned int command,
                                   unsigned long argument)
@@ -149,6 +229,12 @@ static long virtusb_control_ioctl(struct file *file,
    switch (command) {
    case VIRTUSB_IOCTL_GET_PORT_STATUS:
       return virtusb_control_get_port_status(control, argp);
+
+   case VIRTUSB_IOCTL_DEVICE_CREATE:
+      return virtusb_control_device_create(argp);
+
+   case VIRTUSB_IOCTL_DEVICE_DESTROY:
+      return virtusb_control_device_destroy(argp);
 
    default:
       return -ENOTTY;

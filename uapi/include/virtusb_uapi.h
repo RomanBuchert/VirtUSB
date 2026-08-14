@@ -49,6 +49,49 @@
 #define VIRTUSB_UAPI_VERSION_MAJOR 0U
 #define VIRTUSB_UAPI_VERSION_MINOR 0U
 
+
+/**
+ * DOC: VirtUSB object identity
+ *
+ * All VirtUSB Core Components share one global runtime object-ID namespace.
+ * Object ID 0 is invalid. IDs are unique during one loaded lifetime of the
+ * VirtUSB kernel module and are not reused after object destruction.
+ */
+typedef __u32 virtusb_object_id_t;
+
+#define VIRTUSB_OBJECT_ID_INVALID ((__u32)0U)
+
+/**
+ * enum virtusb_object_type - VirtUSB Core Component type
+ * @VIRTUSB_OBJECT_TYPE_INVALID: Invalid or unspecified object type.
+ * @VIRTUSB_OBJECT_TYPE_HCD: Virtual USB Host Controller.
+ * @VIRTUSB_OBJECT_TYPE_ROOT_HUB: Virtual USB Root Hub.
+ * @VIRTUSB_OBJECT_TYPE_HUB: Ordinary virtual USB Hub.
+ * @VIRTUSB_OBJECT_TYPE_DEVICE: Virtual USB Device.
+ *
+ * Object type and object identity are independent properties. No part of an
+ * object ID encodes the object type.
+ */
+enum virtusb_object_type {
+   VIRTUSB_OBJECT_TYPE_INVALID = 0,
+   VIRTUSB_OBJECT_TYPE_HCD,
+   VIRTUSB_OBJECT_TYPE_ROOT_HUB,
+   VIRTUSB_OBJECT_TYPE_HUB,
+   VIRTUSB_OBJECT_TYPE_DEVICE,
+};
+
+/**
+ * DOC: VirtUSB device speed capabilities
+ *
+ * Device creation uses a capability mask rather than one negotiated speed.
+ * The effective USB speed is derived later from the attached topology.
+ */
+#define VIRTUSB_SPEED_CAP_LOW  ((__u32)1U << 0)
+#define VIRTUSB_SPEED_CAP_FULL ((__u32)1U << 1)
+#define VIRTUSB_SPEED_CAP_HIGH ((__u32)1U << 2)
+#define VIRTUSB_SPEED_CAP_ALL  (VIRTUSB_SPEED_CAP_LOW | VIRTUSB_SPEED_CAP_FULL | \
+                                VIRTUSB_SPEED_CAP_HIGH)
+
 /**
  * DOC: VirtUSB hub and port addressing
  *
@@ -219,6 +262,29 @@ struct virtusb_speed_map {
 };
 
 /**
+ * struct virtusb_device_create - Create a VirtUsbDev
+ * @speed_caps: Supported-speed capability mask.
+ * @object_id: Receives the global object ID of the created device.
+ */
+struct virtusb_device_create {
+   __u32 speed_caps;
+   virtusb_object_id_t object_id;
+};
+
+/**
+ * struct virtusb_device_destroy - Destroy a VirtUsbDev
+ * @object_id: Global object ID of the device.
+ * @flags: Destruction flags; zero requests normal destruction.
+ */
+struct virtusb_device_destroy {
+   virtusb_object_id_t object_id;
+   __u32 flags;
+};
+
+#define VIRTUSB_DEVICE_DESTROY_FORCE ((__u32)1U << 0)
+#define VIRTUSB_DEVICE_DESTROY_FLAGS VIRTUSB_DEVICE_DESTROY_FORCE
+
+/**
  * DOC: VirtUSB ioctl interface
  *
  * The ioctl type value identifies VirtUSB Control-Plane commands.
@@ -232,6 +298,10 @@ struct virtusb_speed_map {
 
 #define VIRTUSB_IOCTL_GET_PORT_STATUS \
    _IOWR(VIRTUSB_IOCTL_MAGIC, 0x00, struct virtusb_port_status)
+#define VIRTUSB_IOCTL_DEVICE_CREATE \
+   _IOWR(VIRTUSB_IOCTL_MAGIC, 0x02, struct virtusb_device_create)
+#define VIRTUSB_IOCTL_DEVICE_DESTROY \
+   _IOW(VIRTUSB_IOCTL_MAGIC, 0x03, struct virtusb_device_destroy)
 
 #define VIRTUSB_IOCTL_GET_POWER \
    _IOWR(VIRTUSB_IOCTL_MAGIC, 0x01, struct virtusb_status_bitmap)

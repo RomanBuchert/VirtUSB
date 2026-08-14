@@ -168,3 +168,58 @@ int virtusb_get_port_status(struct virtusb_handle *handle,
 
    return 0;
 }
+
+int virtusb_device_create(struct virtusb_handle *handle,
+                          uint32_t speed_caps,
+                          virtusb_object_id_t *object_id)
+{
+   struct virtusb_device_create request;
+   int ret;
+
+   if ((handle == NULL) || (object_id == NULL)) {
+      return -EINVAL;
+   }
+
+   if (handle->fd < 0) {
+      return -EBADF;
+   }
+
+   memset(&request, 0, sizeof(request));
+   request.speed_caps = (__u32)speed_caps;
+
+   ret = ioctl(handle->fd, VIRTUSB_IOCTL_DEVICE_CREATE, &request);
+   if (ret < 0) {
+      return -errno;
+   }
+
+   *object_id = (virtusb_object_id_t)request.object_id;
+
+   return 0;
+}
+
+int virtusb_device_destroy(struct virtusb_handle *handle,
+                           virtusb_object_id_t object_id,
+                           bool force)
+{
+   struct virtusb_device_destroy request;
+   int ret;
+
+   if (handle == NULL) {
+      return -EINVAL;
+   }
+
+   if (handle->fd < 0) {
+      return -EBADF;
+   }
+
+   memset(&request, 0, sizeof(request));
+   request.object_id = (__u32)object_id;
+   request.flags = force ? VIRTUSB_DEVICE_DESTROY_FORCE : 0U;
+
+   ret = ioctl(handle->fd, VIRTUSB_IOCTL_DEVICE_DESTROY, &request);
+   if (ret < 0) {
+      return -errno;
+   }
+
+   return 0;
+}

@@ -1,10 +1,96 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
+#include <linux/err.h>
 #include <linux/errno.h>
-#include <linux/string.h>
+#include <linux/slab.h>
 
 #include "virtusb_device.h"
 #include "virtusb_hub.h"
+#include "virtusb_object_manager.h"
+
+static void virtusb_device_release(struct virtusb_object *object)
+{
+   struct virtusb_device *device;
+
+   device = container_of(object, struct virtusb_device, object);
+
+   WARN_ON(device->upstream_port.peer != NULL);
+
+   kfree(device);
+}
+
+struct virtusb_device *virtusb_device_create(u8 speed)
+{
+   struct virtusb_object *object;
+   struct virtusb_device *device;
+   int ret;
+
+   object = virtusb_object_alloc(sizeof(*device), virtusb_device_release);
+   if (object == NULL) {
+      return ERR_PTR(-ENOMEM);
+   }
+
+   device = container_of(object, struct virtusb_device, object);
+
+   ret = virtusb_port_init(&device->upstream_port,
+                           VIRTUSB_PORT_ROLE_UPSTREAM,
+                           speed,
+                           device);
+   if (ret < 0) {
+      virtusb_object_put(object);
+      return ERR_PTR(ret);
+   }
+
+   ret = virtusb_object_register(object, VIRTUSB_OBJECT_TYPE_DEVICE);
+   if (ret < 0) {
+      virtusb_object_put(object);
+      return ERR_PTR(ret);
+   }
+
+   return device;
+}
+
+int virtusb_device_destroy(struct virtusb_device *device, bool force)
+{
+   int ret;
+
+   if (device == NULL) {
+      return -EINVAL;
+   }
+
+   if (device->upstream_port.peer != NULL) {
+      if (!force) {
+         return -EBUSY;
+      }
+
+      ret = virtusb_device_set_connection_signaling(device, false);
+      if (ret < 0) {
+         return ret;
+      }
+
+      virtusb_device_detach(device);
+   }
+
+   return virtusb_object_unregister(&device->object);
+}
+
+void virtusb_device_shutdown_all(void)
+{
+   struct virtusb_object *object;
+   struct virtusb_device *device;
+
+   for (;;) {
+      object = virtusb_object_lookup_first_by_type(VIRTUSB_OBJECT_TYPE_DEVICE);
+      if (object == NULL) {
+         return;
+      }
+
+      device = container_of(object, struct virtusb_device, object);
+
+      (void)virtusb_device_destroy(device, true);
+      virtusb_object_put(object);
+   }
+}
 
 static struct virtusb_hub *
 virtusb_device_get_attached_hub(const struct virtusb_device *device,
@@ -33,20 +119,6 @@ virtusb_device_get_attached_hub(const struct virtusb_device *device,
    }
 
    return hub;
-}
-
-int virtusb_device_init(struct virtusb_device *device, u8 speed)
-{
-   if (device == NULL) {
-      return -EINVAL;
-   }
-
-   memset(device, 0, sizeof(*device));
-
-   return virtusb_port_init(&device->upstream_port,
-                            VIRTUSB_PORT_ROLE_UPSTREAM,
-                            speed,
-                            device);
 }
 
 int virtusb_device_attach(struct virtusb_device *device,
