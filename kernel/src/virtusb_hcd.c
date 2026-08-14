@@ -133,13 +133,23 @@ static u16 virtusb_hcd_build_port_change(const struct virtusb_hub *hub,
    return change;
 }
 
+static void virtusb_hcd_root_hub_status_changed(struct virtusb_hub *hub,
+                                                  void *context)
+{
+   struct usb_hcd *hcd = context;
+
+   (void)hub;
+
+   if (hcd != NULL) {
+      usb_hcd_poll_rh_status(hcd);
+   }
+}
+
 static int virtusb_hcd_start(struct usb_hcd *hcd)
 {
    /*
-    * VirtUSB has no physical controller hardware to start.
-    *
-    * Root-hub changes will later be reported explicitly through
-    * usb_hcd_poll_rh_status().
+    * VirtUSB has no physical controller hardware to start. Root-hub changes
+    * are reported explicitly through usb_hcd_poll_rh_status().
     */
    hcd->uses_new_polling = 1;
 
@@ -499,6 +509,11 @@ static int virtusb_hcd_platform_probe(struct platform_device *pdev)
       goto put_hcd;
    }
 
+   virtusb_hub_set_status_changed_callback(
+      &virt_hcd->root_hub.hub,
+      virtusb_hcd_root_hub_status_changed,
+      hcd);
+
    platform_set_drvdata(pdev, hcd);
 
    /*
@@ -510,7 +525,18 @@ static int virtusb_hcd_platform_probe(struct platform_device *pdev)
       goto clear_drvdata;
    }
 
+   ret = virtusb_control_instance_create(&virt_hcd->control,
+                                         virt_hcd,
+                                         &pdev->dev,
+                                         virt_hcd->instance);
+   if (ret < 0) {
+      goto remove_hcd;
+   }
+
    return 0;
+
+remove_hcd:
+   usb_remove_hcd(hcd);
 
 clear_drvdata:
    platform_set_drvdata(pdev, NULL);
@@ -523,6 +549,7 @@ put_hcd:
 
 static void virtusb_hcd_platform_remove(struct platform_device *pdev)
 {
+   struct virtusb_hcd *virt_hcd;
    struct usb_hcd *hcd;
 
    hcd = platform_get_drvdata(pdev);
@@ -530,6 +557,10 @@ static void virtusb_hcd_platform_remove(struct platform_device *pdev)
       return;
    }
 
+   virt_hcd = virtusb_hcd_from_linux(hcd);
+
+   virtusb_control_instance_destroy(&virt_hcd->control);
+   virtusb_hub_set_status_changed_callback(&virt_hcd->root_hub.hub, NULL, NULL);
    usb_remove_hcd(hcd);
    platform_set_drvdata(pdev, NULL);
    usb_put_hcd(hcd);

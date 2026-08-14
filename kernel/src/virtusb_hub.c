@@ -6,6 +6,13 @@
 
 #include "virtusb_hub.h"
 
+static void virtusb_hub_notify_status_changed(struct virtusb_hub *hub)
+{
+   if ((hub != NULL) && (hub->status_changed != NULL)) {
+      hub->status_changed(hub, hub->status_changed_context);
+   }
+}
+
 static unsigned int virtusb_hub_packed_word_index(unsigned int position,
                                                    unsigned int bits_per_value)
 {
@@ -63,6 +70,19 @@ void virtusb_hub_reset(struct virtusb_hub *hub)
     */
    memset(&hub->usb, 0, sizeof(hub->usb));
    memset(&hub->usb_change, 0, sizeof(hub->usb_change));
+}
+
+void virtusb_hub_set_status_changed_callback(
+   struct virtusb_hub *hub,
+   virtusb_hub_status_changed_t callback,
+   void *context)
+{
+   if (hub == NULL) {
+      return;
+   }
+
+   hub->status_changed = callback;
+   hub->status_changed_context = context;
 }
 
 bool virtusb_hub_port_is_valid(const struct virtusb_hub *hub,
@@ -123,7 +143,12 @@ void virtusb_hub_mark_port_connection_change(struct virtusb_hub *hub,
       return;
    }
 
+   if ((hub->usb_change.connected & BIT(port_number)) != 0U) {
+      return;
+   }
+
    hub->usb_change.connected |= BIT(port_number);
+   virtusb_hub_notify_status_changed(hub);
 }
 
 int virtusb_hub_set_power_switching_mode(

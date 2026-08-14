@@ -22,6 +22,20 @@
 
 static_assert(VIRTUSB_PACKED_BITS_VALID(VIRTUSB_PORT_SPEED_BITS));
 
+struct virtusb_hub;
+
+/**
+ * typedef virtusb_hub_status_changed_t - Hub status-change notification
+ * @hub: Hub with newly pending USB-defined change information.
+ * @context: Opaque notification-consumer context.
+ *
+ * The callback reports only that new USB-defined hub or port change
+ * information became pending. It does not define how that information is
+ * transported to the host.
+ */
+typedef void (*virtusb_hub_status_changed_t)(struct virtusb_hub *hub,
+                                             void *context);
+
 /**
  * enum virtusb_hub_power_switching_mode - Downstream VBUS switching capability
  * @VIRTUSB_HUB_POWER_SWITCHING_GANGED: All downstream ports switch together.
@@ -90,6 +104,8 @@ struct virtusb_hub_port_usb_change {
  * @ports: Canonical downstream VirtUsbPort instances.
  * @usb: USB-defined protocol state.
  * @usb_change: Pending USB-defined change information.
+ * @status_changed: Optional transport-independent change notification.
+ * @status_changed_context: Opaque context passed to @status_changed.
  *
  * Root hubs currently initialize with individual power switching and per-port
  * over-current detection, matching the existing VirtUSB behavior. These
@@ -108,11 +124,19 @@ struct virtusb_hub {
 
    struct virtusb_hub_port_usb_state usb;
    struct virtusb_hub_port_usb_change usb_change;
+
+   virtusb_hub_status_changed_t status_changed;
+   void *status_changed_context;
 };
 
 int virtusb_hub_init(struct virtusb_hub *hub, unsigned int port_count);
 
 void virtusb_hub_reset(struct virtusb_hub *hub);
+
+void virtusb_hub_set_status_changed_callback(
+   struct virtusb_hub *hub,
+   virtusb_hub_status_changed_t callback,
+   void *context);
 
 bool virtusb_hub_port_is_valid(const struct virtusb_hub *hub,
                                unsigned int port_number);
