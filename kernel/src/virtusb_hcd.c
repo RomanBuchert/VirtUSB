@@ -388,17 +388,10 @@ static int virtusb_hcd_set_port_feature(struct virtusb_hub *hub,
 
    case USB_PORT_FEAT_RESET:
       /*
-       * A reset of an unconnected port has no effect.
-       *
-       * Reset timing and completion will be implemented together with the
-       * downstream-device connection model. Completion must eventually clear
-       * PORT_RESET, set PORT_ENABLE, and set C_PORT_RESET.
+       * The common hub model performs reset and synchronous completion,
+       * including speed selection, PORT_ENABLE, and C_PORT_RESET.
        */
-      if (virtusb_hub_port_is_connected(hub, port_number)) {
-         virtusb_hcd_port_state_clear(&hub->usb.enabled, port_number);
-         virtusb_hcd_port_state_set(&hub->usb.reset, port_number);
-      }
-      break;
+      return virtusb_hub_reset_port(hub, port_number);
 
    default:
       return -EPIPE;

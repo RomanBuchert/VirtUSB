@@ -212,6 +212,159 @@ static long virtusb_control_device_destroy(void __user *argp)
    return ret;
 }
 
+static struct virtusb_device *
+virtusb_control_lookup_device(virtusb_object_id_t object_id,
+                              struct virtusb_object **object)
+{
+   struct virtusb_object *lookup;
+
+   if ((object == NULL) || (object_id == VIRTUSB_OBJECT_ID_INVALID)) {
+      return ERR_PTR(-EINVAL);
+   }
+
+   *object = NULL;
+
+   lookup = virtusb_object_lookup(object_id);
+   if (lookup == NULL) {
+      return ERR_PTR(-ENOENT);
+   }
+
+   if (lookup->type != VIRTUSB_OBJECT_TYPE_DEVICE) {
+      virtusb_object_put(lookup);
+      return ERR_PTR(-EINVAL);
+   }
+
+   *object = lookup;
+
+   return container_of(lookup, struct virtusb_device, object);
+}
+
+static struct virtusb_hub *
+virtusb_control_get_hub(struct virtusb_control *control, __u32 hub_id)
+{
+   if ((control == NULL) || (control->hcd == NULL)) {
+      return NULL;
+   }
+
+   /*
+    * Only the root hub is addressable at this implementation stage.
+    * Hub ID 0 is the controller's root hub.
+    */
+   if (hub_id != 0U) {
+      return NULL;
+   }
+
+   return &control->hcd->root_hub.hub;
+}
+
+static long virtusb_control_device_attach(struct virtusb_control *control,
+                                          void __user *argp)
+{
+   struct virtusb_device_attach request;
+   struct virtusb_object *object;
+   struct virtusb_device *device;
+   struct virtusb_hub *hub;
+   struct virtusb_port *port;
+   int ret;
+
+   if (copy_from_user(&request, argp, sizeof(request)) != 0U) {
+      return -EFAULT;
+   }
+
+   hub = virtusb_control_get_hub(control, request.hub_id);
+   if (hub == NULL) {
+      return -ENOENT;
+   }
+
+   port = virtusb_hub_get_port(hub, request.port);
+   if (port == NULL) {
+      return -EINVAL;
+   }
+
+   device = virtusb_control_lookup_device(request.object_id, &object);
+   if (IS_ERR(device)) {
+      return PTR_ERR(device);
+   }
+
+   ret = virtusb_device_attach(device, port);
+
+   virtusb_object_put(object);
+
+   return ret;
+}
+
+static long virtusb_control_device_detach(void __user *argp)
+{
+   struct virtusb_device_object request;
+   struct virtusb_object *object;
+   struct virtusb_device *device;
+
+   if (copy_from_user(&request, argp, sizeof(request)) != 0U) {
+      return -EFAULT;
+   }
+
+   device = virtusb_control_lookup_device(request.object_id, &object);
+   if (IS_ERR(device)) {
+      return PTR_ERR(device);
+   }
+
+   virtusb_device_detach(device);
+   virtusb_object_put(object);
+
+   return 0;
+}
+
+static long virtusb_control_device_connection(void __user *argp)
+{
+   struct virtusb_device_connection request;
+   struct virtusb_object *object;
+   struct virtusb_device *device;
+   int ret;
+
+   if (copy_from_user(&request, argp, sizeof(request)) != 0U) {
+      return -EFAULT;
+   }
+
+   if (request.enabled > 1U) {
+      return -EINVAL;
+   }
+
+   device = virtusb_control_lookup_device(request.object_id, &object);
+   if (IS_ERR(device)) {
+      return PTR_ERR(device);
+   }
+
+   ret = virtusb_device_set_connection_signaling(device, request.enabled != 0U);
+
+   virtusb_object_put(object);
+
+   return ret;
+}
+
+static long virtusb_control_set_port_power(struct virtusb_control *control,
+                                           void __user *argp)
+{
+   struct virtusb_port_power request;
+   struct virtusb_hub *hub;
+
+   if (copy_from_user(&request, argp, sizeof(request)) != 0U) {
+      return -EFAULT;
+   }
+
+   if (request.powered > 1U) {
+      return -EINVAL;
+   }
+
+   hub = virtusb_control_get_hub(control, request.hub_id);
+   if (hub == NULL) {
+      return -ENOENT;
+   }
+
+   return virtusb_hub_set_port_power(hub,
+                                     request.port,
+                                     request.powered != 0U);
+}
+
 static long virtusb_control_ioctl(struct file *file,
                                   unsigned int command,
                                   unsigned long argument)
@@ -235,6 +388,18 @@ static long virtusb_control_ioctl(struct file *file,
 
    case VIRTUSB_IOCTL_DEVICE_DESTROY:
       return virtusb_control_device_destroy(argp);
+
+   case VIRTUSB_IOCTL_DEVICE_ATTACH:
+      return virtusb_control_device_attach(control, argp);
+
+   case VIRTUSB_IOCTL_DEVICE_DETACH:
+      return virtusb_control_device_detach(argp);
+
+   case VIRTUSB_IOCTL_DEVICE_CONNECTION:
+      return virtusb_control_device_connection(argp);
+
+   case VIRTUSB_IOCTL_SET_PORT_POWER:
+      return virtusb_control_set_port_power(control, argp);
 
    default:
       return -ENOTTY;

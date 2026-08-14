@@ -223,3 +223,113 @@ int virtusb_device_destroy(struct virtusb_handle *handle,
 
    return 0;
 }
+
+int virtusb_device_attach(struct virtusb_handle *handle,
+                          virtusb_object_id_t object_id,
+                          uint32_t hub_id,
+                          uint32_t port)
+{
+   struct virtusb_device_attach request;
+   int ret;
+
+   if (handle == NULL) {
+      return -EINVAL;
+   }
+
+   if (handle->fd < 0) {
+      return -EBADF;
+   }
+
+   memset(&request, 0, sizeof(request));
+   request.object_id = (__u32)object_id;
+   request.hub_id = (__u32)hub_id;
+   request.port = (__u32)port;
+
+   ret = ioctl(handle->fd, VIRTUSB_IOCTL_DEVICE_ATTACH, &request);
+   if (ret < 0) {
+      return -errno;
+   }
+
+   return 0;
+}
+
+int virtusb_device_detach(struct virtusb_handle *handle,
+                          virtusb_object_id_t object_id)
+{
+   struct virtusb_device_object request;
+   int ret;
+
+   if (handle == NULL) {
+      return -EINVAL;
+   }
+
+   if (handle->fd < 0) {
+      return -EBADF;
+   }
+
+   memset(&request, 0, sizeof(request));
+   request.object_id = (__u32)object_id;
+
+   ret = ioctl(handle->fd, VIRTUSB_IOCTL_DEVICE_DETACH, &request);
+   if (ret < 0) {
+      return -errno;
+   }
+
+   return 0;
+}
+
+int virtusb_device_set_connected(struct virtusb_handle *handle,
+                                 virtusb_object_id_t object_id,
+                                 bool connected)
+{
+   struct virtusb_device_connection request;
+   int ret;
+
+   if (handle == NULL) {
+      return -EINVAL;
+   }
+
+   if (handle->fd < 0) {
+      return -EBADF;
+   }
+
+   memset(&request, 0, sizeof(request));
+   request.object_id = (__u32)object_id;
+   request.enabled = connected ? 1U : 0U;
+
+   ret = ioctl(handle->fd, VIRTUSB_IOCTL_DEVICE_CONNECTION, &request);
+   if (ret < 0) {
+      return -errno;
+   }
+
+   return 0;
+}
+
+int virtusb_set_port_power(struct virtusb_handle *handle,
+                           uint32_t hub_id,
+                           uint32_t port,
+                           bool powered)
+{
+   struct virtusb_port_power request;
+   int ret;
+
+   if (handle == NULL) {
+      return -EINVAL;
+   }
+
+   if (handle->fd < 0) {
+      return -EBADF;
+   }
+
+   memset(&request, 0, sizeof(request));
+   request.hub_id = (__u32)hub_id;
+   request.port = (__u32)port;
+   request.powered = powered ? 1U : 0U;
+
+   ret = ioctl(handle->fd, VIRTUSB_IOCTL_SET_PORT_POWER, &request);
+   if (ret < 0) {
+      return -errno;
+   }
+
+   return 0;
+}

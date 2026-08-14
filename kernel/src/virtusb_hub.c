@@ -25,6 +25,58 @@ static unsigned int virtusb_hub_packed_shift(unsigned int position,
    return (position % VIRTUSB_PACKED_VALUES_PER_WORD(bits_per_value)) * bits_per_value;
 }
 
+static void virtusb_hub_set_port_speed(struct virtusb_hub *hub,
+                                       unsigned int port_number,
+                                       enum virtusb_port_speed speed)
+{
+   unsigned int word_index;
+   unsigned int shift;
+   u32 mask;
+
+   word_index = virtusb_hub_packed_word_index(port_number, VIRTUSB_PORT_SPEED_BITS);
+   shift = virtusb_hub_packed_shift(port_number, VIRTUSB_PORT_SPEED_BITS);
+   mask = VIRTUSB_PACKED_VALUE_MASK(VIRTUSB_PORT_SPEED_BITS) << shift;
+
+   hub->usb.speed[word_index] &= ~mask;
+   hub->usb.speed[word_index] |= ((u32)speed << shift) & mask;
+}
+
+static enum virtusb_port_speed
+virtusb_hub_determine_port_speed(const struct virtusb_hub *hub,
+                                 unsigned int port_number)
+{
+   const struct virtusb_port *downstream;
+   const struct virtusb_port *upstream;
+   u8 capabilities;
+
+   downstream = virtusb_hub_get_port_const(hub, port_number);
+   if (downstream == NULL) {
+      return VIRTUSB_PORT_SPEED_NONE;
+   }
+
+   upstream = downstream->peer;
+   if ((upstream == NULL) ||
+       (upstream->role != VIRTUSB_PORT_ROLE_UPSTREAM)) {
+      return VIRTUSB_PORT_SPEED_NONE;
+   }
+
+   capabilities = downstream->speed & upstream->speed;
+
+   if ((capabilities & VIRTUSB_PORT_SPEED_CAP_HIGH) != 0U) {
+      return VIRTUSB_PORT_SPEED_HIGH;
+   }
+
+   if ((capabilities & VIRTUSB_PORT_SPEED_CAP_FULL) != 0U) {
+      return VIRTUSB_PORT_SPEED_FULL;
+   }
+
+   if ((capabilities & VIRTUSB_PORT_SPEED_CAP_LOW) != 0U) {
+      return VIRTUSB_PORT_SPEED_LOW;
+   }
+
+   return VIRTUSB_PORT_SPEED_NONE;
+}
+
 int virtusb_hub_init(struct virtusb_hub *hub, unsigned int port_count)
 {
    unsigned int port;
@@ -143,12 +195,58 @@ void virtusb_hub_mark_port_connection_change(struct virtusb_hub *hub,
       return;
    }
 
+   if (!virtusb_hub_port_is_connected(hub, port_number)) {
+      hub->usb.enabled &= ~BIT(port_number);
+      hub->usb.suspended &= ~BIT(port_number);
+      hub->usb.reset &= ~BIT(port_number);
+      virtusb_hub_set_port_speed(hub, port_number, VIRTUSB_PORT_SPEED_NONE);
+   }
+
    if ((hub->usb_change.connected & BIT(port_number)) != 0U) {
       return;
    }
 
    hub->usb_change.connected |= BIT(port_number);
    virtusb_hub_notify_status_changed(hub);
+}
+
+int virtusb_hub_reset_port(struct virtusb_hub *hub,
+                           unsigned int port_number)
+{
+   enum virtusb_port_speed speed;
+
+   if (!virtusb_hub_port_is_valid(hub, port_number)) {
+      return -EINVAL;
+   }
+
+   if (!virtusb_hub_port_is_connected(hub, port_number)) {
+      return -ENODEV;
+   }
+
+   speed = virtusb_hub_determine_port_speed(hub, port_number);
+   if (speed == VIRTUSB_PORT_SPEED_NONE) {
+      return -EOPNOTSUPP;
+   }
+
+   /*
+    * The protocol state models the result of a real USB reset sequence. Reset
+    * timing is intentionally not simulated yet; completion is synchronous.
+    */
+   hub->usb.enabled &= ~BIT(port_number);
+   hub->usb.suspended &= ~BIT(port_number);
+   hub->usb.reset |= BIT(port_number);
+
+   virtusb_hub_set_port_speed(hub, port_number, speed);
+
+   hub->usb.reset &= ~BIT(port_number);
+   hub->usb.enabled |= BIT(port_number);
+
+   if ((hub->usb_change.reset & BIT(port_number)) == 0U) {
+      hub->usb_change.reset |= BIT(port_number);
+      virtusb_hub_notify_status_changed(hub);
+   }
+
+   return 0;
 }
 
 int virtusb_hub_set_power_switching_mode(

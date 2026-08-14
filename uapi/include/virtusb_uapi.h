@@ -272,6 +272,48 @@ struct virtusb_device_create {
 };
 
 /**
+ * struct virtusb_device_attach - Attach a VirtUsbDev to a downstream port
+ * @object_id: Global object ID of the device.
+ * @hub_id: Hub containing the target downstream port.
+ * @port: One-based downstream port number.
+ */
+struct virtusb_device_attach {
+   virtusb_object_id_t object_id;
+   __u32 hub_id;
+   __u32 port;
+};
+
+/**
+ * struct virtusb_device_object - Address one VirtUsbDev
+ * @object_id: Global object ID of the device.
+ */
+struct virtusb_device_object {
+   virtusb_object_id_t object_id;
+};
+
+/**
+ * struct virtusb_device_connection - Set device-side connection signaling
+ * @object_id: Global object ID of the device.
+ * @enabled: Zero disables signaling; one enables signaling.
+ */
+struct virtusb_device_connection {
+   virtusb_object_id_t object_id;
+   __u32 enabled;
+};
+
+/**
+ * struct virtusb_port_power - Set simulated downstream VBUS state
+ * @hub_id: Hub containing the downstream port.
+ * @port: One-based downstream port number.
+ * @powered: Zero removes VBUS; one applies VBUS.
+ */
+struct virtusb_port_power {
+   __u32 hub_id;
+   __u32 port;
+   __u32 powered;
+};
+
+/**
  * struct virtusb_device_destroy - Destroy a VirtUsbDev
  * @object_id: Global object ID of the device.
  * @flags: Destruction flags; zero requests normal destruction.
@@ -290,9 +332,14 @@ struct virtusb_device_destroy {
  * The ioctl type value identifies VirtUSB Control-Plane commands.
  *
  * USB-visible hub-port state retains USB semantics. In particular,
- * PORT_CONNECTION and PORT_POWER are not exposed as arbitrary writable
- * Control-Plane properties. Writable commands operate only on VirtUSB-specific
- * management state or simulated hardware conditions.
+ * PORT_CONNECTION is not exposed as an arbitrary writable Control-Plane
+ * property. Writable commands operate on VirtUSB-specific management state or
+ * simulated hardware conditions.
+ *
+ * Downstream VBUS may be manipulated through the Control Plane as a simulated
+ * hardware condition. This changes the same canonical VirtUsbPort.powered
+ * state that USB hub PORT_POWER operations act upon; no duplicate power state
+ * exists.
  */
 #define VIRTUSB_IOCTL_MAGIC 0xB9U
 
@@ -302,6 +349,14 @@ struct virtusb_device_destroy {
    _IOWR(VIRTUSB_IOCTL_MAGIC, 0x02, struct virtusb_device_create)
 #define VIRTUSB_IOCTL_DEVICE_DESTROY \
    _IOW(VIRTUSB_IOCTL_MAGIC, 0x03, struct virtusb_device_destroy)
+#define VIRTUSB_IOCTL_DEVICE_ATTACH \
+   _IOW(VIRTUSB_IOCTL_MAGIC, 0x20, struct virtusb_device_attach)
+#define VIRTUSB_IOCTL_DEVICE_DETACH \
+   _IOW(VIRTUSB_IOCTL_MAGIC, 0x21, struct virtusb_device_object)
+#define VIRTUSB_IOCTL_DEVICE_CONNECTION \
+   _IOW(VIRTUSB_IOCTL_MAGIC, 0x22, struct virtusb_device_connection)
+#define VIRTUSB_IOCTL_SET_PORT_POWER \
+   _IOW(VIRTUSB_IOCTL_MAGIC, 0x23, struct virtusb_port_power)
 
 #define VIRTUSB_IOCTL_GET_POWER \
    _IOWR(VIRTUSB_IOCTL_MAGIC, 0x01, struct virtusb_status_bitmap)

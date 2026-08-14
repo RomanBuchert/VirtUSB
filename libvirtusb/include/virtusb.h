@@ -100,7 +100,7 @@ struct virtusb_handle;
 
 typedef uint32_t virtusb_object_id_t;
 
-#define VIRTUSB_OBJECT_ID_INVALID ((virtusb_object_id_t)0U)
+#define VIRTUSB_INVALID_OBJECT_ID ((virtusb_object_id_t)0U)
 
 #define VIRTUSB_DEVICE_SPEED_LOW  (1U << 0)
 #define VIRTUSB_DEVICE_SPEED_FULL (1U << 1)
@@ -176,6 +176,59 @@ int virtusb_device_create(struct virtusb_handle *handle,
 int virtusb_device_destroy(struct virtusb_handle *handle,
                            virtusb_object_id_t object_id,
                            bool force);
+
+/**
+ * virtusb_device_attach() - Attach a device to a downstream port
+ * @handle: Open VirtUSB Control-Plane handle selecting the HCD.
+ * @object_id: Global runtime object ID.
+ * @hub_id: Hub containing the target downstream port.
+ * @port: One-based downstream port number.
+ *
+ * Return: 0 on success or a negative errno value on failure.
+ */
+int virtusb_device_attach(struct virtusb_handle *handle,
+                          virtusb_object_id_t object_id,
+                          uint32_t hub_id,
+                          uint32_t port);
+
+/**
+ * virtusb_device_detach() - Detach a virtual USB device
+ * @handle: Open VirtUSB Control-Plane handle.
+ * @object_id: Global runtime object ID.
+ *
+ * Return: 0 on success or a negative errno value on failure.
+ */
+int virtusb_device_detach(struct virtusb_handle *handle,
+                          virtusb_object_id_t object_id);
+
+/**
+ * virtusb_device_set_connected() - Control device-side USB connection signaling
+ * @handle: Open VirtUSB Control-Plane handle.
+ * @object_id: Global runtime object ID.
+ * @connected: true to signal USB presence, false to stop signaling.
+ *
+ * Return: 0 on success or a negative errno value on failure.
+ */
+int virtusb_device_set_connected(struct virtusb_handle *handle,
+                                 virtusb_object_id_t object_id,
+                                 bool connected);
+
+/**
+ * virtusb_set_port_power() - Set simulated downstream VBUS state
+ * @handle: Open VirtUSB Control-Plane handle selecting the HCD.
+ * @hub_id: Hub containing the downstream port.
+ * @port: One-based downstream port number.
+ * @powered: true to apply VBUS, false to remove VBUS.
+ *
+ * This is a simulated hardware operation, not a request to synthesize a USB
+ * SetPortFeature(PORT_POWER) transaction.
+ *
+ * Return: 0 on success or a negative errno value on failure.
+ */
+int virtusb_set_port_power(struct virtusb_handle *handle,
+                           uint32_t hub_id,
+                           uint32_t port,
+                           bool powered);
 
 #ifdef __cplusplus
 }

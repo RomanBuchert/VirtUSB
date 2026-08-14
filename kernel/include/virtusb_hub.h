@@ -155,6 +155,25 @@ int virtusb_hub_find_port_number(const struct virtusb_hub *hub,
 void virtusb_hub_mark_port_connection_change(struct virtusb_hub *hub,
                                               unsigned int port_number);
 
+
+/**
+ * virtusb_hub_reset_port() - Perform and complete a USB port reset
+ * @hub: Hub containing the downstream port.
+ * @port_number: One-based downstream port number.
+ *
+ * VirtUSB currently models reset completion synchronously. A connected port
+ * is disabled, reset, assigned the effective operating speed derived from both
+ * attached port capabilities, re-enabled, and marked with C_PORT_RESET.
+ *
+ * The reset-completion timing required by a physical USB bus is not simulated
+ * at this implementation stage.
+ *
+ * Return: 0 on success or a negative error code if the port is invalid,
+ * disconnected, or has no compatible USB speed.
+ */
+int virtusb_hub_reset_port(struct virtusb_hub *hub,
+                           unsigned int port_number);
+
 int virtusb_hub_set_power_switching_mode(
    struct virtusb_hub *hub,
    enum virtusb_hub_power_switching_mode mode);

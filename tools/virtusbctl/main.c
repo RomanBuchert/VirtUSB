@@ -15,7 +15,17 @@ static void virtusbctl_print_usage(const char *program)
            "Usage:\n"
            "  %s [-d INSTANCE] status [PORT]\n"
            "  %s [-d INSTANCE] device create SPEED[,SPEED...]\n"
-           "  %s [-d INSTANCE] device destroy OBJECT_ID [--force]\n",
+           "  %s [-d INSTANCE] device destroy OBJECT_ID [--force]\n"
+           "  %s [-d INSTANCE] device attach OBJECT_ID PORT\n"
+           "  %s [-d INSTANCE] device detach OBJECT_ID\n"
+           "  %s [-d INSTANCE] device connect OBJECT_ID\n"
+           "  %s [-d INSTANCE] device disconnect OBJECT_ID\n"
+           "  %s [-d INSTANCE] port power PORT on|off\n",
+           program,
+           program,
+           program,
+           program,
+           program,
            program,
            program,
            program);
@@ -230,6 +240,142 @@ static int virtusbctl_device_destroy(unsigned int instance,
    return EXIT_SUCCESS;
 }
 
+static int virtusbctl_device_attach(unsigned int instance,
+                                     virtusb_object_id_t object_id,
+                                     unsigned int port)
+{
+   struct virtusb_handle *handle;
+   int ret;
+
+   ret = virtusb_open(instance, &handle);
+   if (ret < 0) {
+      fprintf(stderr,
+              "Failed to open /dev/virtusb%u: %s\n",
+              instance,
+              strerror(-ret));
+      return EXIT_FAILURE;
+   }
+
+   ret = virtusb_device_attach(handle, object_id, 0U, port);
+   if (ret < 0) {
+      fprintf(stderr,
+              "Failed to attach device %u to port %u: %s\n",
+              object_id,
+              port,
+              strerror(-ret));
+      virtusb_close(handle);
+      return EXIT_FAILURE;
+   }
+
+   printf("Device %u attached to port %u\n", object_id, port);
+
+   virtusb_close(handle);
+
+   return EXIT_SUCCESS;
+}
+
+static int virtusbctl_device_detach(unsigned int instance,
+                                     virtusb_object_id_t object_id)
+{
+   struct virtusb_handle *handle;
+   int ret;
+
+   ret = virtusb_open(instance, &handle);
+   if (ret < 0) {
+      fprintf(stderr,
+              "Failed to open /dev/virtusb%u: %s\n",
+              instance,
+              strerror(-ret));
+      return EXIT_FAILURE;
+   }
+
+   ret = virtusb_device_detach(handle, object_id);
+   if (ret < 0) {
+      fprintf(stderr,
+              "Failed to detach device %u: %s\n",
+              object_id,
+              strerror(-ret));
+      virtusb_close(handle);
+      return EXIT_FAILURE;
+   }
+
+   printf("Device detached: %u\n", object_id);
+
+   virtusb_close(handle);
+
+   return EXIT_SUCCESS;
+}
+
+static int virtusbctl_device_connection(unsigned int instance,
+                                         virtusb_object_id_t object_id,
+                                         bool connected)
+{
+   struct virtusb_handle *handle;
+   int ret;
+
+   ret = virtusb_open(instance, &handle);
+   if (ret < 0) {
+      fprintf(stderr,
+              "Failed to open /dev/virtusb%u: %s\n",
+              instance,
+              strerror(-ret));
+      return EXIT_FAILURE;
+   }
+
+   ret = virtusb_device_set_connected(handle, object_id, connected);
+   if (ret < 0) {
+      fprintf(stderr,
+              "Failed to %s device %u: %s\n",
+              connected ? "connect" : "disconnect",
+              object_id,
+              strerror(-ret));
+      virtusb_close(handle);
+      return EXIT_FAILURE;
+   }
+
+   printf("Device %s: %u\n",
+          connected ? "connected" : "disconnected",
+          object_id);
+
+   virtusb_close(handle);
+
+   return EXIT_SUCCESS;
+}
+
+static int virtusbctl_port_power(unsigned int instance,
+                                 unsigned int port,
+                                 bool powered)
+{
+   struct virtusb_handle *handle;
+   int ret;
+
+   ret = virtusb_open(instance, &handle);
+   if (ret < 0) {
+      fprintf(stderr,
+              "Failed to open /dev/virtusb%u: %s\n",
+              instance,
+              strerror(-ret));
+      return EXIT_FAILURE;
+   }
+
+   ret = virtusb_set_port_power(handle, 0U, port, powered);
+   if (ret < 0) {
+      fprintf(stderr,
+              "Failed to set port %u power %s: %s\n",
+              port,
+              powered ? "on" : "off",
+              strerror(-ret));
+      virtusb_close(handle);
+      return EXIT_FAILURE;
+   }
+
+   printf("Port %u power: %s\n", port, powered ? "on" : "off");
+
+   virtusb_close(handle);
+
+   return EXIT_SUCCESS;
+}
+
 static int virtusbctl_status(unsigned int instance, unsigned int port)
 {
    struct virtusb_handle *handle;
@@ -337,6 +483,50 @@ int main(int argc, char **argv)
       return virtusbctl_status(instance, port);
    }
 
+   if (strcmp(argv[argument], "port") == 0) {
+      ++argument;
+
+      if ((argument >= argc) || (strcmp(argv[argument], "power") != 0)) {
+         virtusbctl_print_usage(argv[0]);
+         return EXIT_FAILURE;
+      }
+
+      ++argument;
+
+      if ((argument >= argc) ||
+          (virtusbctl_parse_unsigned(argv[argument], &port) < 0) ||
+          (port == 0U) ||
+          (port > VIRTUSB_MAX_PORTS)) {
+         fprintf(stderr, "Invalid port\n");
+         return EXIT_FAILURE;
+      }
+
+      ++argument;
+
+      if (argument >= argc) {
+         virtusbctl_print_usage(argv[0]);
+         return EXIT_FAILURE;
+      }
+
+      if (strcmp(argv[argument], "on") == 0) {
+         force = true;
+      } else if (strcmp(argv[argument], "off") == 0) {
+         force = false;
+      } else {
+         fprintf(stderr, "Power state must be 'on' or 'off'\n");
+         return EXIT_FAILURE;
+      }
+
+      ++argument;
+
+      if (argument != argc) {
+         virtusbctl_print_usage(argv[0]);
+         return EXIT_FAILURE;
+      }
+
+      return virtusbctl_port_power(instance, port, force);
+   }
+
    if (strcmp(argv[argument], "device") != 0) {
       virtusbctl_print_usage(argv[0]);
       return EXIT_FAILURE;
@@ -371,7 +561,7 @@ int main(int argc, char **argv)
 
       if ((argument >= argc) ||
           (virtusbctl_parse_unsigned(argv[argument], &value) < 0) ||
-          (value == VIRTUSB_OBJECT_ID_INVALID)) {
+          (value == VIRTUSB_INVALID_OBJECT_ID)) {
          fprintf(stderr, "Invalid object ID\n");
          return EXIT_FAILURE;
       }
@@ -391,6 +581,84 @@ int main(int argc, char **argv)
       return virtusbctl_device_destroy(instance,
                                        (virtusb_object_id_t)value,
                                        force);
+   }
+
+   if (strcmp(argv[argument], "attach") == 0) {
+      ++argument;
+
+      if ((argument >= argc) ||
+          (virtusbctl_parse_unsigned(argv[argument], &value) < 0) ||
+          (value == VIRTUSB_INVALID_OBJECT_ID)) {
+         fprintf(stderr, "Invalid object ID\n");
+         return EXIT_FAILURE;
+      }
+
+      ++argument;
+
+      if ((argument >= argc) ||
+          (virtusbctl_parse_unsigned(argv[argument], &port) < 0) ||
+          (port == 0U) ||
+          (port > VIRTUSB_MAX_PORTS)) {
+         fprintf(stderr, "Invalid port\n");
+         return EXIT_FAILURE;
+      }
+
+      ++argument;
+
+      if (argument != argc) {
+         virtusbctl_print_usage(argv[0]);
+         return EXIT_FAILURE;
+      }
+
+      return virtusbctl_device_attach(instance,
+                                      (virtusb_object_id_t)value,
+                                      port);
+   }
+
+   if (strcmp(argv[argument], "detach") == 0) {
+      ++argument;
+
+      if ((argument >= argc) ||
+          (virtusbctl_parse_unsigned(argv[argument], &value) < 0) ||
+          (value == VIRTUSB_INVALID_OBJECT_ID)) {
+         fprintf(stderr, "Invalid object ID\n");
+         return EXIT_FAILURE;
+      }
+
+      ++argument;
+
+      if (argument != argc) {
+         virtusbctl_print_usage(argv[0]);
+         return EXIT_FAILURE;
+      }
+
+      return virtusbctl_device_detach(instance,
+                                      (virtusb_object_id_t)value);
+   }
+
+   if ((strcmp(argv[argument], "connect") == 0) ||
+       (strcmp(argv[argument], "disconnect") == 0)) {
+      bool connected = strcmp(argv[argument], "connect") == 0;
+
+      ++argument;
+
+      if ((argument >= argc) ||
+          (virtusbctl_parse_unsigned(argv[argument], &value) < 0) ||
+          (value == VIRTUSB_INVALID_OBJECT_ID)) {
+         fprintf(stderr, "Invalid object ID\n");
+         return EXIT_FAILURE;
+      }
+
+      ++argument;
+
+      if (argument != argc) {
+         virtusbctl_print_usage(argv[0]);
+         return EXIT_FAILURE;
+      }
+
+      return virtusbctl_device_connection(instance,
+                                          (virtusb_object_id_t)value,
+                                          connected);
    }
 
    virtusbctl_print_usage(argv[0]);
