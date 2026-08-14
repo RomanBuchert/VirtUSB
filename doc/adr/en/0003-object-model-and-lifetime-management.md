@@ -142,6 +142,13 @@ The local `speed` field is a capability bit mask. The current USB operating
 speed is determined by the USB protocol layer and is not stored in
 `VirtUsbPort`.
 
+Upstream-port hardware contains device-side connection signaling. This state
+represents whether the virtual device currently signals USB presence to its
+attached downstream peer. It is independent of Attachment and is intended to
+map directly to device-controller connect/disconnect operations. VirtUSB does
+not model the device's internal power supply, firmware state, controller
+availability, or other device-internal prerequisites.
+
 Downstream-port hardware contains the actual VBUS/power state and, where the
 hub uses per-port protection, the local over-current condition.
 
@@ -408,6 +415,33 @@ over-current condition is downstream-port-local hardware state.
 
 The USB hub protocol layer converts these hardware capabilities and states into
 the USB 2.0 descriptor, status, and change representations.
+
+
+### Hub Status Change Notification
+
+`VirtUsbHub` owns the USB-defined hub and port change state. When new,
+previously unreported USB-defined change information becomes pending, the hub
+notifies its owner through a generic hub-status-change notification mechanism.
+
+The notification reports only that pending hub status/change information is
+available. It deliberately does not define how that information is transported
+toward the host.
+
+The same mechanism is used by both hub forms:
+
+- `VirtUsbRHub` maps the notification through `VirtUsbHcd` to the host
+  controller's root-hub status-notification mechanism.
+- A regular `VirtUsbHub` maps the notification to its USB hub interrupt-IN
+  endpoint.
+
+This keeps USB hub status/change semantics in the common hub model while the
+transport remains specific to the owning adapter or device implementation.
+
+A virtual-hardware state transition and a USB-defined change condition are not
+the same event. Hardware state is first interpreted according to USB rules. A
+notification is emitted only when this produces new pending USB-defined change
+information; repeatedly observing an already-pending change does not create a
+new notification requirement.
 
 ### Object Relationships
 
