@@ -389,6 +389,83 @@ type-specific resources when the final reference is dropped.
 The generic object layer provides the common reference-counting
 mechanism but does not contain type-specific destruction logic.
 
+### Normal and Forced Destruction
+
+Explicit destruction is the normal runtime lifecycle operation for VirtUSB
+Core Components.
+
+Normal destruction is conservative. A type-specific destroy operation may
+refuse destruction with `-EBUSY` while the component is still in a state that
+requires explicit cleanup, for example while a device remains attached or,
+in later implementations, while transfers or backend operations are active.
+
+Management interfaces may additionally provide an explicit forced-destruction
+operation. Forced destruction means that the concrete Core Component performs
+the type-specific cleanup required to make destruction possible before it is
+unregistered. For a `VirtUsbDev`, this includes at least disabling
+device-side connection signaling and detaching the upstream port. Later
+transfer or backend implementations may add further type-specific shutdown
+steps.
+
+Forced destruction is an explicit administrative operation. It must not be
+the implicit behavior of an ordinary runtime destroy request.
+
+The object manager itself does not implement forced destruction. It remains
+responsible only for generic identity, publication, lookup, registry
+references, and reference-counted lifetime. The concrete Core Component owns
+the semantics and ordering of its normal and forced destruction.
+
+### Module Shutdown
+
+Module unload is a special shutdown condition. VirtUSB must not leave
+registered Core Components behind when the module is unloaded.
+
+The module-level shutdown sequence therefore performs controlled forced
+shutdown of all remaining Core Components before the object manager is shut
+down. New management operations must no longer create or publish objects once
+module shutdown has begun.
+
+Conceptually:
+
+```text
+Module unload begins
+   ↓
+Stop accepting new object-creating/management operations
+   ↓
+Perform type-specific forced shutdown of remaining Core Components
+   ↓
+Unregister remaining objects
+   ↓
+Drop registry and shutdown references
+   ↓
+Destroy HCD/module infrastructure
+   ↓
+Verify object registry is empty
+   ↓
+Shut down VirtUsbObjMgr
+```
+
+The exact ordering between component classes may be refined as additional Core
+Components become managed objects, but topology and active operations must be
+made safe before their owning infrastructure disappears.
+
+`VirtUsbObjMgr` does not silently destroy objects during its own shutdown.
+An object manager that is not empty at that point indicates an error in the
+preceding module-level shutdown sequence and should be detected as such.
+
+This gives VirtUSB three distinct lifecycle cases:
+
+```text
+normal destroy
+   conservative; may fail with -EBUSY
+
+forced destroy
+   explicit administrative cleanup followed by destruction
+
+module unload
+   controlled forced shutdown of all remaining objects
+```
+
 ### Hub Hardware Capabilities
 
 Hub hardware capabilities are modeled independently from USB protocol state.

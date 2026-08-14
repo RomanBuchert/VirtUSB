@@ -297,6 +297,43 @@ over-current hardware condition. The USB protocol layer translates this
 hardware model into the corresponding USB 2.0 hub or port status.
 
 
+## Normal Destruction
+
+**Normal Destruction** is the explicit, conservative runtime destruction of a
+VirtUSB Core Component.
+
+A normal destroy operation may fail with `-EBUSY` while the component still
+requires explicit cleanup, for example while it remains attached or while
+operations that prevent safe destruction are active.
+
+Normal destruction does not implicitly mean forced teardown.
+
+## Forced Destruction
+
+**Forced Destruction** is an explicit administrative destruction mode in which
+a concrete VirtUSB Core Component first performs the type-specific shutdown
+required to make destruction safe and then unregisters and releases the
+object.
+
+The required cleanup depends on the component type. `VirtUsbObjMgr` does not
+define or perform forced-destruction semantics.
+
+A userspace control tool may expose this distinction through an explicit
+option such as `--force`.
+
+## Module Shutdown
+
+**Module Shutdown** is the controlled teardown performed when the VirtUSB
+kernel module is unloaded.
+
+Remaining Core Components are forcibly shut down in a defined order before
+`VirtUsbObjMgr` is shut down. The object manager itself does not silently
+destroy remaining objects; its registry is expected to be empty after the
+module-level cleanup has completed.
+
+Module Shutdown is therefore distinct from both an ordinary runtime destroy
+request and a userspace-requested Forced Destruction.
+
 ## Hub Status Change Notification
 
 A **Hub Status Change Notification** is a generic notification emitted by the

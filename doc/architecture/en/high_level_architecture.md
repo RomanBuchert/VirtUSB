@@ -209,6 +209,39 @@ It is not stored as an independent device-to-HCD relationship.
 
 Detaching a device removes only its peer relationship; it does not destroy the device.
 
+### Core Component Destruction and Module Shutdown
+
+Core Component destruction is normally explicit and independent of topology
+changes or USB-visible state changes.
+
+A normal destroy request is conservative and may fail with `-EBUSY` while a
+component still requires explicit cleanup. Management interfaces may offer a
+separate forced-destruction operation for administrative use. Forced
+destruction performs the component-specific shutdown required to make the
+object safe to unregister and release.
+
+The distinction is intentional:
+
+```text
+normal destroy
+   explicit, conservative lifecycle operation
+
+forced destroy
+   explicit administrative teardown
+
+module unload
+   controlled forced shutdown of all remaining Core Components
+```
+
+Forced-destruction behavior belongs to the concrete Core Component, not to
+`VirtUsbObjMgr`. The object manager continues to provide only generic object
+identity, publication, lookup, and reference-counted lifetime.
+
+During module unload, VirtUSB stops accepting new object-creating operations,
+performs the required forced shutdown of remaining Core Components, and only
+then shuts down the object manager. The object-manager registry must be empty
+at the end of this sequence.
+
 ### Cascading
 
 VirtUSB does not introduce any additional artificial limitation on hub
