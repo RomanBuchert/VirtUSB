@@ -23,6 +23,7 @@ add_linux_kernel_module(
       src/virtusb_port.c
       src/virtusb_device.c
       src/virtusb_transfer.c
+      src/virtusb_backend.c
       src/virtusb_hub.c
       src/virtusb_root_hub.c
       src/virtusb_hcd.c

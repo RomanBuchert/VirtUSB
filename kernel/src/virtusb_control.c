@@ -6,11 +6,14 @@
 #include <linux/errno.h>
 #include <linux/fs.h>
 #include <linux/module.h>
+#include <linux/poll.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/uaccess.h>
 
 #include <virtusb_uapi.h>
 
+#include "virtusb_backend.h"
 #include "virtusb_control.h"
 #include "virtusb_hcd.h"
 #include "virtusb_device.h"
@@ -23,6 +26,10 @@
 static dev_t virtusb_control_base_devt;
 static struct class *virtusb_control_class;
 static unsigned int virtusb_control_instance_count;
+
+struct virtusb_control_file {
+   struct virtusb_control *control;
+};
 
 static bool virtusb_control_state_test(u32 state, unsigned int port)
 {
@@ -365,14 +372,105 @@ static long virtusb_control_set_port_power(struct virtusb_control *control,
                                      request.powered != 0U);
 }
 
+static long virtusb_control_backend_register(struct file *file,
+                                             struct virtusb_control *control,
+                                             void __user *argp)
+{
+   struct virtusb_backend_register request;
+   struct virtusb_object *object;
+   struct virtusb_device *device;
+   int ret;
+
+   if (copy_from_user(&request, argp, sizeof(request)) != 0U) {
+      return -EFAULT;
+   }
+
+   device = virtusb_control_lookup_device(request.object_id, &object);
+   if (IS_ERR(device)) {
+      return PTR_ERR(device);
+   }
+
+   /*
+    * Backend registration is a communication-session binding, not topology
+    * membership. The device must already belong to this HCD through the
+    * Attachment tree. At this implementation stage only direct root-hub
+    * children are supported by the HCD transfer router.
+    */
+   if ((device->upstream_port.peer == NULL) ||
+       (device->upstream_port.peer->owner != &control->hcd->root_hub.hub)) {
+      virtusb_object_put(object);
+      return -ENODEV;
+   }
+
+   ret = virtusb_backend_register(control->hcd, file, device);
+   virtusb_object_put(object);
+   return ret;
+}
+
+static long virtusb_control_transfer_fetch(struct file *file,
+                                           struct virtusb_control *control,
+                                           void __user *argp)
+{
+   struct virtusb_transfer_fetch *fetch;
+   int ret;
+
+   fetch = kzalloc(sizeof(*fetch), GFP_KERNEL);
+   if (fetch == NULL) {
+      return -ENOMEM;
+   }
+
+   ret = virtusb_backend_fetch(control->hcd,
+                               file,
+                               fetch,
+                               (file->f_flags & O_NONBLOCK) != 0);
+   if (ret < 0) {
+      goto free_fetch;
+   }
+
+   if (copy_to_user(argp, fetch, sizeof(*fetch)) != 0U) {
+      (void)virtusb_backend_fetch_rollback(control->hcd, file, fetch->transfer_id);
+      ret = -EFAULT;
+      goto free_fetch;
+   }
+
+   ret = 0;
+
+free_fetch:
+   kfree(fetch);
+   return ret;
+}
+
+static long virtusb_control_transfer_complete(struct file *file,
+                                              struct virtusb_control *control,
+                                              void __user *argp)
+{
+   struct virtusb_transfer_complete_request *completion;
+   int ret;
+
+   completion = memdup_user(argp, sizeof(*completion));
+   if (IS_ERR(completion)) {
+      return PTR_ERR(completion);
+   }
+
+   ret = virtusb_backend_complete(control->hcd,
+                                  control->hcd->linux_hcd,
+                                  file,
+                                  completion);
+   kfree(completion);
+
+   return ret;
+}
+
 static long virtusb_control_ioctl(struct file *file,
                                   unsigned int command,
                                   unsigned long argument)
 {
+   struct virtusb_control_file *context;
    struct virtusb_control *control;
    void __user *argp;
 
-   control = file->private_data;
+   context = file->private_data;
+   control = context != NULL ? context->control : NULL;
    if ((control == NULL) || (control->hcd == NULL) || !control->active) {
       return -ENODEV;
    }
@@ -401,6 +499,21 @@ static long virtusb_control_ioctl(struct file *file,
    case VIRTUSB_IOCTL_SET_PORT_POWER:
       return virtusb_control_set_port_power(control, argp);
 
+   case VIRTUSB_IOCTL_BACKEND_REGISTER:
+      return virtusb_control_backend_register(file, control, argp);
+
+   case VIRTUSB_IOCTL_BACKEND_UNREGISTER:
+      virtusb_backend_release_owner(control->hcd,
+                                    control->hcd->linux_hcd,
+                                    file);
+      return 0;
+
+   case VIRTUSB_IOCTL_TRANSFER_FETCH:
+      return virtusb_control_transfer_fetch(file, control, argp);
+
+   case VIRTUSB_IOCTL_TRANSFER_COMPLETE:
+      return virtusb_control_transfer_complete(file, control, argp);
+
    default:
       return -ENOTTY;
    }
@@ -408,22 +521,63 @@ static long virtusb_control_ioctl(struct file *file,
 
 static int virtusb_control_open(struct inode *inode, struct file *file)
 {
+   struct virtusb_control_file *context;
    struct virtusb_control *control;
 
    control = container_of(inode->i_cdev, struct virtusb_control, cdev);
 
-   file->private_data = control;
+   context = kzalloc(sizeof(*context), GFP_KERNEL);
+   if (context == NULL) {
+      return -ENOMEM;
+   }
+
+   context->control = control;
+   file->private_data = context;
 
    return 0;
 }
 
 static int virtusb_control_release(struct inode *inode, struct file *file)
 {
+   struct virtusb_control_file *context;
+   struct virtusb_control *control;
+
    (void)inode;
 
+   context = file->private_data;
+   control = context != NULL ? context->control : NULL;
+
+   if ((control != NULL) && (control->hcd != NULL)) {
+      virtusb_backend_release_owner(control->hcd,
+                                    control->hcd->linux_hcd,
+                                    file);
+   }
+
+   kfree(context);
    file->private_data = NULL;
 
    return 0;
+}
+
+static __poll_t virtusb_control_poll(struct file *file, poll_table *wait)
+{
+   struct virtusb_control_file *context;
+   struct virtusb_control *control;
+   __poll_t mask = 0;
+
+   context = file->private_data;
+   control = context != NULL ? context->control : NULL;
+   if ((control == NULL) || (control->hcd == NULL) || !control->active) {
+      return EPOLLERR | EPOLLHUP;
+   }
+
+   poll_wait(file, &control->hcd->backend.wait_queue, wait);
+
+   if (virtusb_backend_has_pending(control->hcd, file)) {
+      mask |= EPOLLIN | EPOLLRDNORM;
+   }
+
+   return mask;
 }
 
 static const struct file_operations virtusb_control_file_operations = {
@@ -431,6 +585,7 @@ static const struct file_operations virtusb_control_file_operations = {
    .open = virtusb_control_open,
    .release = virtusb_control_release,
    .unlocked_ioctl = virtusb_control_ioctl,
+   .poll = virtusb_control_poll,
 };
 
 int virtusb_control_register(unsigned int instance_count)

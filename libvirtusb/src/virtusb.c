@@ -333,3 +333,123 @@ int virtusb_set_port_power(struct virtusb_handle *handle,
 
    return 0;
 }
+
+
+int virtusb_backend_register(struct virtusb_handle *handle,
+                             virtusb_object_id_t object_id)
+{
+   struct virtusb_backend_register request;
+   int ret;
+
+   if ((handle == NULL) || (object_id == VIRTUSB_INVALID_OBJECT_ID)) {
+      return -EINVAL;
+   }
+
+   if (handle->fd < 0) {
+      return -EBADF;
+   }
+
+   memset(&request, 0, sizeof(request));
+   request.object_id = object_id;
+
+   ret = ioctl(handle->fd, VIRTUSB_IOCTL_BACKEND_REGISTER, &request);
+   if (ret < 0) {
+      return -errno;
+   }
+
+   return 0;
+}
+
+int virtusb_backend_unregister(struct virtusb_handle *handle)
+{
+   int ret;
+
+   if (handle == NULL) {
+      return -EINVAL;
+   }
+
+   if (handle->fd < 0) {
+      return -EBADF;
+   }
+
+   ret = ioctl(handle->fd, VIRTUSB_IOCTL_BACKEND_UNREGISTER);
+   if (ret < 0) {
+      return -errno;
+   }
+
+   return 0;
+}
+
+int virtusb_transfer_fetch(struct virtusb_handle *handle,
+                           struct virtusb_transfer_request *request)
+{
+   struct virtusb_transfer_fetch fetch;
+   int ret;
+
+   if ((handle == NULL) || (request == NULL)) {
+      return -EINVAL;
+   }
+
+   if (handle->fd < 0) {
+      return -EBADF;
+   }
+
+   memset(&fetch, 0, sizeof(fetch));
+   ret = ioctl(handle->fd, VIRTUSB_IOCTL_TRANSFER_FETCH, &fetch);
+   if (ret < 0) {
+      return -errno;
+   }
+
+   memset(request, 0, sizeof(*request));
+   request->id = fetch.transfer_id;
+   request->object_id = fetch.object_id;
+   request->type = (enum virtusb_transfer_type)fetch.type;
+   request->direction = (enum virtusb_transfer_direction)fetch.direction;
+   request->endpoint = fetch.endpoint;
+   request->has_setup = fetch.has_setup != 0U;
+   request->requested_length = fetch.requested_length;
+   request->data_length = fetch.data_length;
+   memcpy(request->setup, fetch.setup, sizeof(request->setup));
+   memcpy(request->data, fetch.data, sizeof(request->data));
+
+   return 0;
+}
+
+int virtusb_transfer_complete(struct virtusb_handle *handle,
+                              uint64_t transfer_id,
+                              int status,
+                              const void *data,
+                              uint32_t actual_length)
+{
+   struct virtusb_transfer_complete_request completion;
+   int ret;
+
+   if (handle == NULL) {
+      return -EINVAL;
+   }
+
+   if (handle->fd < 0) {
+      return -EBADF;
+   }
+
+   if ((actual_length > VIRTUSB_TRANSFER_DATA_MAX) ||
+       ((actual_length > 0U) && (data == NULL))) {
+      return -EINVAL;
+   }
+
+   memset(&completion, 0, sizeof(completion));
+   completion.transfer_id = transfer_id;
+   completion.status = status;
+   completion.actual_length = actual_length;
+
+   if (actual_length > 0U) {
+      memcpy(completion.data, data, actual_length);
+   }
+
+   ret = ioctl(handle->fd, VIRTUSB_IOCTL_TRANSFER_COMPLETE, &completion);
+   if (ret < 0) {
+      return -errno;
+   }
+
+   return 0;
+}

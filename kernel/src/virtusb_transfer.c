@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
+#include <linux/atomic.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/string.h>
@@ -7,6 +8,8 @@
 #include "virtusb_device.h"
 #include "virtusb_object.h"
 #include "virtusb_transfer.h"
+
+static atomic64_t virtusb_transfer_next_id = ATOMIC64_INIT(0);
 
 static void virtusb_transfer_release(struct kref *refcount)
 {
@@ -76,6 +79,7 @@ struct virtusb_transfer *virtusb_transfer_create(
    }
 
    kref_init(&transfer->refcount);
+   transfer->id = (u64)atomic64_inc_return(&virtusb_transfer_next_id);
    transfer->device = container_of(virtusb_object_get(&device->object),
                                    struct virtusb_device,
                                    object);

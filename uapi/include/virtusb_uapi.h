@@ -292,6 +292,18 @@ struct virtusb_device_object {
 };
 
 /**
+ * struct virtusb_backend_register - Register one backend instance
+ * @object_id: Virtual device hardware represented by this backend instance.
+ *
+ * Registration binds the calling open controller-interface file description
+ * to exactly one VirtUsbDev for USB Data-Plane routing. It does not attach or
+ * connect the device and therefore does not change USB topology or visibility.
+ */
+struct virtusb_backend_register {
+   virtusb_object_id_t object_id;
+};
+
+/**
  * struct virtusb_device_connection - Set device-side connection signaling
  * @object_id: Global object ID of the device.
  * @enabled: Zero disables signaling; one enables signaling.
@@ -341,6 +353,50 @@ struct virtusb_device_destroy {
  * state that USB hub PORT_POWER operations act upon; no duplicate power state
  * exists.
  */
+
+/**
+ * DOC: VirtUSB bootstrap transfer data plane
+ *
+ * The bootstrap data plane deliberately uses bounded ioctl messages. It exists
+ * to validate transfer routing, ownership, cancellation, and completion before
+ * the final mmap()-backed ring transport is introduced. Linux struct urb is
+ * never exposed through this ABI.
+ *
+ * This bootstrap interface is experimental and is not a stable VirtUSB ABI.
+ * The ioctl numbers, structures, and bounded payload representation may change
+ * or be removed when the mmap()-backed USB Data Plane replaces it.
+ */
+#define VIRTUSB_TRANSFER_DATA_MAX 4096U
+#define VIRTUSB_TRANSFER_SETUP_SIZE 8U
+
+#define VIRTUSB_UAPI_TRANSFER_TYPE_CONTROL     0U
+#define VIRTUSB_UAPI_TRANSFER_TYPE_ISOCHRONOUS 1U
+#define VIRTUSB_UAPI_TRANSFER_TYPE_BULK        2U
+#define VIRTUSB_UAPI_TRANSFER_TYPE_INTERRUPT   3U
+
+#define VIRTUSB_UAPI_TRANSFER_DIRECTION_OUT 0U
+#define VIRTUSB_UAPI_TRANSFER_DIRECTION_IN  1U
+
+struct virtusb_transfer_fetch {
+   __u64 transfer_id;
+   virtusb_object_id_t object_id;
+   __u32 type;
+   __u32 direction;
+   __u32 endpoint;
+   __u32 has_setup;
+   __u32 requested_length;
+   __u32 data_length;
+   __u8 setup[VIRTUSB_TRANSFER_SETUP_SIZE];
+   __u8 data[VIRTUSB_TRANSFER_DATA_MAX];
+};
+
+struct virtusb_transfer_complete_request {
+   __u64 transfer_id;
+   __s32 status;
+   __u32 actual_length;
+   __u8 data[VIRTUSB_TRANSFER_DATA_MAX];
+};
+
 #define VIRTUSB_IOCTL_MAGIC 0xB9U
 
 #define VIRTUSB_IOCTL_GET_PORT_STATUS \
@@ -357,6 +413,14 @@ struct virtusb_device_destroy {
    _IOW(VIRTUSB_IOCTL_MAGIC, 0x22, struct virtusb_device_connection)
 #define VIRTUSB_IOCTL_SET_PORT_POWER \
    _IOW(VIRTUSB_IOCTL_MAGIC, 0x23, struct virtusb_port_power)
+#define VIRTUSB_IOCTL_BACKEND_REGISTER \
+   _IOW(VIRTUSB_IOCTL_MAGIC, 0x30, struct virtusb_backend_register)
+#define VIRTUSB_IOCTL_BACKEND_UNREGISTER \
+   _IO(VIRTUSB_IOCTL_MAGIC, 0x31)
+#define VIRTUSB_IOCTL_TRANSFER_FETCH \
+   _IOR(VIRTUSB_IOCTL_MAGIC, 0x40, struct virtusb_transfer_fetch)
+#define VIRTUSB_IOCTL_TRANSFER_COMPLETE \
+   _IOW(VIRTUSB_IOCTL_MAGIC, 0x41, struct virtusb_transfer_complete_request)
 
 #define VIRTUSB_IOCTL_GET_POWER \
    _IOWR(VIRTUSB_IOCTL_MAGIC, 0x01, struct virtusb_status_bitmap)

@@ -10,6 +10,9 @@
 #include <linux/usb.h>
 #include <linux/usb/hcd.h>
 
+#include <virtusb_uapi.h>
+
+#include "virtusb_backend.h"
 #include "virtusb_hcd.h"
 #include "virtusb_device.h"
 #include "virtusb_transfer.h"
@@ -314,29 +317,33 @@ static int virtusb_hcd_urb_enqueue(struct usb_hcd *hcd,
               le16_to_cpu(transfer->setup.wLength));
    }
 
-   /*
-    * The generic transfer now exists, but no backend/data-plane queue owns it
-    * yet. Do not link the URB into the HCD until that ownership and completion
-    * path exists; returning an error keeps Linux USB-core lifetime semantics
-    * correct while making the new conversion layer independently testable.
-    */
+   if (transfer->requested_length > VIRTUSB_TRANSFER_DATA_MAX) {
+      virtusb_transfer_put(transfer);
+      return -EMSGSIZE;
+   }
+
+   ret = virtusb_backend_submit(virtusb_hcd_from_linux(hcd),
+                                hcd,
+                                urb,
+                                transfer,
+                                mem_flags);
    virtusb_transfer_put(transfer);
 
-   return -EOPNOTSUPP;
+   return ret;
 }
 
 static int virtusb_hcd_urb_dequeue(struct usb_hcd *hcd,
                                    struct urb *urb,
                                    int status)
 {
-   (void)hcd;
-   (void)urb;
-   (void)status;
+   if ((hcd == NULL) || (urb == NULL)) {
+      return -EINVAL;
+   }
 
-   /*
-    * No downstream URBs can be queued yet.
-    */
-   return -ENODEV;
+   return virtusb_backend_cancel(virtusb_hcd_from_linux(hcd),
+                                 hcd,
+                                 urb,
+                                 status);
 }
 
 static int virtusb_hcd_hub_status_data(struct usb_hcd *hcd, char *buf)
@@ -650,6 +657,7 @@ static int virtusb_hcd_platform_probe(struct platform_device *pdev)
 
    virt_hcd = virtusb_hcd_from_linux(hcd);
    virt_hcd->instance = (unsigned int)pdev->id;
+   virt_hcd->linux_hcd = hcd;
 
    /*
     * The VirtUSB USB 2.0 root hub can directly service low- and full-speed
@@ -657,6 +665,8 @@ static int virtusb_hcd_platform_probe(struct platform_device *pdev)
     * transaction-translator semantics, like a USB 2.0 rate-matching root hub.
     */
    hcd->has_tt = 1;
+
+   virtusb_backend_init(&virt_hcd->backend);
 
    ret = virtusb_root_hub_init(&virt_hcd->root_hub, *port_count);
    if (ret < 0) {
@@ -723,6 +733,7 @@ static void virtusb_hcd_platform_remove(struct platform_device *pdev)
 
    virtusb_control_instance_destroy(&virt_hcd->control);
    virtusb_hub_set_status_changed_callback(&virt_hcd->root_hub.hub, NULL, NULL);
+   virtusb_backend_stop(virt_hcd, hcd);
    usb_remove_hcd(hcd);
    platform_set_drvdata(pdev, NULL);
    usb_put_hcd(hcd);

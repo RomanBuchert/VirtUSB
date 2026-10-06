@@ -42,6 +42,7 @@ enum virtusb_transfer_state {
 
 struct virtusb_transfer {
    struct kref refcount;
+   u64 id;
    struct virtusb_device *device;
 
    enum virtusb_transfer_type type;

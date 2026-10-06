@@ -230,6 +230,67 @@ int virtusb_set_port_power(struct virtusb_handle *handle,
                            uint32_t port,
                            bool powered);
 
+
+#define VIRTUSB_TRANSFER_DATA_MAX 4096U
+#define VIRTUSB_TRANSFER_SETUP_SIZE 8U
+
+enum virtusb_transfer_type {
+   VIRTUSB_TRANSFER_CONTROL = 0,
+   VIRTUSB_TRANSFER_ISOCHRONOUS,
+   VIRTUSB_TRANSFER_BULK,
+   VIRTUSB_TRANSFER_INTERRUPT,
+};
+
+enum virtusb_transfer_direction {
+   VIRTUSB_TRANSFER_OUT = 0,
+   VIRTUSB_TRANSFER_IN,
+};
+
+struct virtusb_transfer_request {
+   uint64_t id;
+   virtusb_object_id_t object_id;
+   enum virtusb_transfer_type type;
+   enum virtusb_transfer_direction direction;
+   uint32_t endpoint;
+   bool has_setup;
+   uint32_t requested_length;
+   uint32_t data_length;
+   uint8_t setup[VIRTUSB_TRANSFER_SETUP_SIZE];
+   uint8_t data[VIRTUSB_TRANSFER_DATA_MAX];
+};
+
+/**
+ * virtusb_backend_register() - Register this handle as a device backend
+ * @handle: Open controller-interface handle.
+ * @object_id: Virtual device hardware represented by the backend.
+ *
+ * Backend registration is independent of device attachment and USB connection.
+ * One open handle may represent at most one backend instance.
+ *
+ * Return: 0 on success or a negative errno value on failure.
+ */
+int virtusb_backend_register(struct virtusb_handle *handle,
+                             virtusb_object_id_t object_id);
+
+/**
+ * virtusb_backend_unregister() - Unregister the backend on this handle
+ * @handle: Open controller-interface handle.
+ *
+ * Outstanding transfers routed to this backend are terminated. Backend
+ * unregistration does not detach, disconnect, or destroy the virtual device.
+ *
+ * Return: 0 on success or a negative errno value on failure.
+ */
+int virtusb_backend_unregister(struct virtusb_handle *handle);
+
+int virtusb_transfer_fetch(struct virtusb_handle *handle,
+                           struct virtusb_transfer_request *request);
+int virtusb_transfer_complete(struct virtusb_handle *handle,
+                              uint64_t transfer_id,
+                              int status,
+                              const void *data,
+                              uint32_t actual_length);
+
 #ifdef __cplusplus
 }
 #endif

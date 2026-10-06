@@ -4,10 +4,12 @@
 
 #include <linux/types.h>
 
+#include "virtusb_backend.h"
 #include "virtusb_control.h"
 #include "virtusb_root_hub.h"
 
 struct platform_device;
+struct usb_hcd;
 
 /**
  * DOC: VirtUSB host controller model
@@ -47,7 +49,9 @@ struct platform_device;
  */
 struct virtusb_hcd {
    unsigned int instance;
+   struct usb_hcd *linux_hcd;
    struct virtusb_root_hub root_hub;
+   struct virtusb_backend backend;
    struct virtusb_control control;
 };
 
