@@ -11,6 +11,8 @@
 #include <linux/usb/hcd.h>
 
 #include "virtusb_hcd.h"
+#include "virtusb_device.h"
+#include "virtusb_transfer.h"
 
 #define VIRTUSB_HCD_DEVICE_NAME "virtusb-hcd"
 #define VIRTUSB_HCD_DESCRIPTION "virtusb-hcd"
@@ -147,12 +149,12 @@ static void virtusb_hcd_root_hub_status_changed(struct virtusb_hub *hub,
 
 static int virtusb_hcd_start(struct usb_hcd *hcd)
 {
+   (void)hcd;
+
    /*
     * VirtUSB has no physical controller hardware to start. Root-hub changes
     * are reported explicitly through usb_hcd_poll_rh_status().
     */
-   hcd->uses_new_polling = 1;
-
    return 0;
 }
 
@@ -161,18 +163,166 @@ static void virtusb_hcd_stop(struct usb_hcd *hcd)
    (void)hcd;
 }
 
+static struct virtusb_device *virtusb_hcd_get_urb_device(
+   struct usb_hcd *hcd,
+   const struct urb *urb)
+{
+   struct virtusb_hcd *virt_hcd;
+   struct virtusb_port *downstream;
+   struct virtusb_port *upstream;
+   unsigned int port_number;
+
+   if ((hcd == NULL) || (urb == NULL) || (urb->dev == NULL)) {
+      return NULL;
+   }
+
+   /*
+    * Only devices attached directly to the root hub exist at this stage.
+    * Ordinary VirtUSB hubs will later resolve transfers by walking the same
+    * canonical port topology instead of introducing a second routing model.
+    */
+   if (urb->dev->parent != hcd->self.root_hub) {
+      return NULL;
+   }
+
+   port_number = urb->dev->portnum;
+   virt_hcd = virtusb_hcd_from_linux(hcd);
+   downstream = virtusb_hub_get_port(&virt_hcd->root_hub.hub, port_number);
+   if (downstream == NULL) {
+      return NULL;
+   }
+
+   upstream = downstream->peer;
+   if ((upstream == NULL) ||
+       (upstream->role != VIRTUSB_PORT_ROLE_UPSTREAM) ||
+       (upstream->owner == NULL)) {
+      return NULL;
+   }
+
+   return upstream->owner;
+}
+
+static int virtusb_hcd_get_transfer_type(const struct urb *urb,
+                                         enum virtusb_transfer_type *type)
+{
+   if ((urb == NULL) || (type == NULL)) {
+      return -EINVAL;
+   }
+
+   switch (usb_pipetype(urb->pipe)) {
+   case PIPE_CONTROL:
+      *type = VIRTUSB_TRANSFER_TYPE_CONTROL;
+      break;
+
+   case PIPE_ISOCHRONOUS:
+      *type = VIRTUSB_TRANSFER_TYPE_ISOCHRONOUS;
+      break;
+
+   case PIPE_BULK:
+      *type = VIRTUSB_TRANSFER_TYPE_BULK;
+      break;
+
+   case PIPE_INTERRUPT:
+      *type = VIRTUSB_TRANSFER_TYPE_INTERRUPT;
+      break;
+
+   default:
+      return -EINVAL;
+   }
+
+   return 0;
+}
+
 static int virtusb_hcd_urb_enqueue(struct usb_hcd *hcd,
                                    struct urb *urb,
                                    gfp_t mem_flags)
 {
-   (void)hcd;
-   (void)urb;
-   (void)mem_flags;
+   const struct usb_ctrlrequest *setup = NULL;
+   struct virtusb_transfer *transfer;
+   struct virtusb_device *device;
+   enum virtusb_transfer_direction direction;
+   enum virtusb_transfer_type type;
+   const void *data = NULL;
+   u8 endpoint;
+   int ret;
+
+   if ((hcd == NULL) || (urb == NULL)) {
+      return -EINVAL;
+   }
+
+   device = virtusb_hcd_get_urb_device(hcd, urb);
+   if (device == NULL) {
+      return -ENODEV;
+   }
+
+   ret = virtusb_hcd_get_transfer_type(urb, &type);
+   if (ret < 0) {
+      return ret;
+   }
 
    /*
-    * No downstream VirtUsbDev transfer path exists yet.
+    * Scatter/gather and isochronous packet descriptors need additional
+    * transport representation. Keep this first transfer-model step explicit
+    * instead of silently flattening semantics that the backend cannot yet
+    * preserve.
     */
-   return -ENODEV;
+   if ((urb->num_sgs != 0) || (urb->number_of_packets != 0)) {
+      return -EOPNOTSUPP;
+   }
+
+   direction = usb_pipein(urb->pipe) ? VIRTUSB_TRANSFER_DIRECTION_IN
+                                     : VIRTUSB_TRANSFER_DIRECTION_OUT;
+   endpoint = (u8)usb_pipeendpoint(urb->pipe);
+
+   if (type == VIRTUSB_TRANSFER_TYPE_CONTROL) {
+      if (urb->setup_packet == NULL) {
+         return -EINVAL;
+      }
+
+      setup = (const struct usb_ctrlrequest *)urb->setup_packet;
+   }
+
+   if ((direction == VIRTUSB_TRANSFER_DIRECTION_OUT) &&
+       (urb->transfer_buffer_length > 0)) {
+      data = urb->transfer_buffer;
+      if (data == NULL) {
+         return -EINVAL;
+      }
+   }
+
+   transfer = virtusb_transfer_create(device,
+                                      type,
+                                      direction,
+                                      endpoint,
+                                      setup,
+                                      data,
+                                      urb->transfer_buffer_length,
+                                      mem_flags);
+   if (transfer == NULL) {
+      return -ENOMEM;
+   }
+
+   if (transfer->has_setup) {
+      dev_dbg(hcd->self.controller,
+              "EP0 SETUP dev=%u reqtype=0x%02x req=0x%02x value=0x%04x "
+              "index=0x%04x length=%u\n",
+              device->object.id,
+              transfer->setup.bRequestType,
+              transfer->setup.bRequest,
+              le16_to_cpu(transfer->setup.wValue),
+              le16_to_cpu(transfer->setup.wIndex),
+              le16_to_cpu(transfer->setup.wLength));
+   }
+
+   /*
+    * The generic transfer now exists, but no backend/data-plane queue owns it
+    * yet. Do not link the URB into the HCD until that ownership and completion
+    * path exists; returning an error keeps Linux USB-core lifetime semantics
+    * correct while making the new conversion layer independently testable.
+    */
+   virtusb_transfer_put(transfer);
+
+   return -EOPNOTSUPP;
 }
 
 static int virtusb_hcd_urb_dequeue(struct usb_hcd *hcd,
@@ -461,6 +611,10 @@ static const struct hc_driver virtusb_hc_driver = {
    .description = VIRTUSB_HCD_DESCRIPTION,
    .product_desc = VIRTUSB_HCD_PRODUCT,
    .hcd_priv_size = sizeof(struct virtusb_hcd),
+   /*
+    * VirtUSB exposes a USB 2.0 host controller to Linux. Virtual downstream
+    * devices may operate at low, full, or high speed.
+    */
    .flags = HCD_USB2,
 
    .start = virtusb_hcd_start,
@@ -497,9 +651,29 @@ static int virtusb_hcd_platform_probe(struct platform_device *pdev)
    virt_hcd = virtusb_hcd_from_linux(hcd);
    virt_hcd->instance = (unsigned int)pdev->id;
 
+   /*
+    * The VirtUSB USB 2.0 root hub can directly service low- and full-speed
+    * devices. Tell the Linux USB core that it therefore provides integrated
+    * transaction-translator semantics, like a USB 2.0 rate-matching root hub.
+    */
+   hcd->has_tt = 1;
+
    ret = virtusb_root_hub_init(&virt_hcd->root_hub, *port_count);
    if (ret < 0) {
       goto put_hcd;
+   }
+
+   platform_set_drvdata(pdev, hcd);
+
+   /*
+    * VirtUSB has no physical IRQ. Register the HCD with the USB core before
+    * installing the VirtUSB root-hub notification callback. This guarantees
+    * that an asynchronous topology change can only call
+    * usb_hcd_poll_rh_status() after the Linux root hub is fully registered.
+    */
+   ret = usb_add_hcd(hcd, 0, 0);
+   if (ret < 0) {
+      goto clear_drvdata;
    }
 
    virtusb_hub_set_status_changed_callback(
@@ -507,16 +681,11 @@ static int virtusb_hcd_platform_probe(struct platform_device *pdev)
       virtusb_hcd_root_hub_status_changed,
       hcd);
 
-   platform_set_drvdata(pdev, hcd);
-
    /*
-    * VirtUSB has no physical IRQ. Root-hub changes are reported through the
-    * generic root-hub polling interface.
+    * Reconcile any change state that may have been created while usb_add_hcd()
+    * initialized the root hub and the callback was intentionally disabled.
     */
-   ret = usb_add_hcd(hcd, 0, 0);
-   if (ret < 0) {
-      goto clear_drvdata;
-   }
+   usb_hcd_poll_rh_status(hcd);
 
    ret = virtusb_control_instance_create(&virt_hcd->control,
                                          virt_hcd,
